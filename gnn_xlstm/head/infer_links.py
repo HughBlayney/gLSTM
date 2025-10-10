@@ -3,7 +3,7 @@ from torch_geometric.graphgym import cfg
 from torch_geometric.graphgym.register import register_head
 
 
-@register_head('infer_links')
+@register_head("infer_links")
 class InferLinksHead(torch.nn.Module):
     """
     InferLinks prediction head for graph prediction tasks.
@@ -18,7 +18,9 @@ class InferLinksHead(torch.nn.Module):
         if cfg.dataset.infer_link_label == "edge":
             dim_out = 2
         else:
-            raise ValueError(f"Infer-link task {cfg.dataset.infer_link_label} not available.")
+            raise ValueError(
+                f"Infer-link task {cfg.dataset.infer_link_label} not available."
+            )
 
         self.predictor = torch.nn.Linear(1, dim_out)
 

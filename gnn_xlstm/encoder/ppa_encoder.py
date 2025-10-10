@@ -1,9 +1,11 @@
 import torch
-from torch_geometric.graphgym.register import (register_node_encoder,
-                                               register_edge_encoder)
+from torch_geometric.graphgym.register import (
+    register_edge_encoder,
+    register_node_encoder,
+)
 
 
-@register_node_encoder('PPANode')
+@register_node_encoder("PPANode")
 class PPANodeEncoder(torch.nn.Module):
     """
     Uniform input node embedding for PPA that has no node features.
@@ -18,7 +20,7 @@ class PPANodeEncoder(torch.nn.Module):
         return batch
 
 
-@register_edge_encoder('PPAEdge')
+@register_edge_encoder("PPAEdge")
 class PPAEdgeEncoder(torch.nn.Module):
     def __init__(self, emb_dim):
         super().__init__()

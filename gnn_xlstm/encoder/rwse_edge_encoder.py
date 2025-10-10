@@ -1,11 +1,10 @@
 import torch
 import torch.nn as nn
 from torch_geometric.graphgym.config import cfg
-from torch_geometric.graphgym.register import (register_edge_encoder,
-act_dict)
+from torch_geometric.graphgym.register import act_dict, register_edge_encoder
 
 
-@register_edge_encoder('RWSEEdge')
+@register_edge_encoder("RWSEEdge")
 class RWSEEdgeEncoder(torch.nn.Module):
     def __init__(self, emb_dim):
         super().__init__()
@@ -26,15 +25,20 @@ class RWSEEdgeEncoder(torch.nn.Module):
     def forward(self, batch):
         pe_enc = torch.cat([batch.pestat_RWSEEdge, batch.pestat_RWSESelf], dim=0)
 
-        self_loops = torch.arange(batch.num_nodes, device=pe_enc.device).view(1, -1).tile(2, 1)
+        self_loops = (
+            torch.arange(batch.num_nodes, device=pe_enc.device).view(1, -1).tile(2, 1)
+        )
         edge_index = torch.cat([batch.edge_index, self_loops], dim=1)
 
-        if 'pestat_RWSEGlobal' in batch:
+        if "pestat_RWSEGlobal" in batch:
             global_enc = batch.pestat_RWSEGlobal
             global_edge_index = batch.global_edge_index
 
             if self.training:
-                dropout_mask = torch.rand((global_enc.shape[0],), device=global_enc.device) > self.global_edge_dropout
+                dropout_mask = (
+                    torch.rand((global_enc.shape[0],), device=global_enc.device)
+                    > self.global_edge_dropout
+                )
                 global_enc = global_enc[dropout_mask]
                 global_edge_index = global_edge_index[:, dropout_mask]
 
@@ -45,7 +49,7 @@ class RWSEEdgeEncoder(torch.nn.Module):
 
         edge_attr = pe_enc
         if batch.edge_attr is not None:
-            edge_attr[:batch.num_edges] += batch.edge_attr
+            edge_attr[: batch.num_edges] += batch.edge_attr
 
         batch.edge_index = edge_index
         batch.edge_attr = edge_attr

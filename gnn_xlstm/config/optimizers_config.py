@@ -1,7 +1,7 @@
 from torch_geometric.graphgym.register import register_config
 
 
-@register_config('extended_optim')
+@register_config("extended_optim")
 def extended_optim_cfg(cfg):
     """Extend optimizer config group that is first set by GraphGym in
     torch_geometric.graphgym.config.set_cfg
@@ -26,3 +26,9 @@ def extended_optim_cfg(cfg):
     # Clip gradient norms while training
     cfg.optim.clip_grad_norm = False
     cfg.optim.clip_grad_norm_value = 1.0
+
+    # Early stopping patience
+    cfg.optim.early_stopping_patience = None
+
+    # Early stopping loss threshold
+    cfg.optim.early_stopping_loss_threshold = None

@@ -1,0 +1,61 @@
+out_dir: results
+metric_best: ap
+wandb:
+  use: True
+  project: peptides-functional
+dataset:
+  format: OGB
+  name: peptides-functional
+  task: graph
+  task_type: classification_multilabel
+  transductive: False
+  node_encoder: True
+  node_encoder_name: Atom
+  node_encoder_bn: False
+  edge_encoder: True
+  edge_encoder_name: Bond
+  edge_encoder_bn: False
+train:
+  mode: custom
+  batch_size: 128
+  eval_period: 1
+  ckpt_best: True
+  ckpt_clean: True
+  parameter_limit: 500000
+  dependent_parameter: gnn.dim_inner
+model:
+  type: gnn_ssm
+  loss_fun: cross_entropy
+  graph_pooling: mean
+gnn:
+  dim_inner: 512
+  layers_mp: 42
+  layers_post_mp: 1
+  batchnorm: True
+  shared: False
+  use_k_hop_aggregation: True
+ssm:
+  message_passing_activation_function: relu
+  use_state_matrix: True
+  use_input_matrix: True
+  state_gating: False
+  input_gating: False
+  shared_state: True
+  shared_input: True
+  shared_gating: True
+  dyn: True
+  state_eigenvalue_magnitude: 1.0
+  input_eigenvalue_magnitude: None
+  train_state: False
+  train_input: False
+  conv_func: GCN
+optim:
+  clip_grad_norm: True
+  optimizer: adamW
+  weight_decay: 0.0
+  base_lr: 0.001
+  max_epoch: 1500
+  scheduler: reduce_on_plateau
+  reduce_factor: 0.5
+  schedule_patience: 100
+  min_lr: 1e-5

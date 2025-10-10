@@ -2,12 +2,7 @@ import logging
 import time
 
 import torch
-
-from torch_geometric.graphgym.checkpoint import (
-    clean_ckpt,
-    load_ckpt,
-    save_ckpt,
-)
+from torch_geometric.graphgym.checkpoint import clean_ckpt, load_ckpt, save_ckpt
 from torch_geometric.graphgym.config import cfg
 from torch_geometric.graphgym.loss import compute_loss
 from torch_geometric.graphgym.register import register_train
@@ -24,11 +19,14 @@ def train_epoch(logger, loader, model, optimizer, scheduler):
         loss, pred_score = compute_loss(pred, true)
         loss.backward()
         optimizer.step()
-        logger.update_stats(true=true.detach().cpu(),
-                            pred=pred_score.detach().cpu(), loss=loss.item(),
-                            lr=scheduler.get_last_lr()[0],
-                            time_used=time.time() - time_start,
-                            params=cfg.params)
+        logger.update_stats(
+            true=true.detach().cpu(),
+            pred=pred_score.detach().cpu(),
+            loss=loss.item(),
+            lr=scheduler.get_last_lr()[0],
+            time_used=time.time() - time_start,
+            params=cfg.params,
+        )
         time_start = time.time()
     scheduler.step()
 
@@ -40,23 +38,26 @@ def eval_epoch(logger, loader, model):
         batch.to(torch.device(cfg.device))
         pred, true = model(batch)
         loss, pred_score = compute_loss(pred, true)
-        logger.update_stats(true=true.detach().cpu(),
-                            pred=pred_score.detach().cpu(), loss=loss.item(),
-                            lr=0, time_used=time.time() - time_start,
-                            params=cfg.params)
+        logger.update_stats(
+            true=true.detach().cpu(),
+            pred=pred_score.detach().cpu(),
+            loss=loss.item(),
+            lr=0,
+            time_used=time.time() - time_start,
+            params=cfg.params,
+        )
         time_start = time.time()
 
 
-@register_train('example')
+@register_train("example")
 def train_example(loggers, loaders, model, optimizer, scheduler):
     start_epoch = 0
     if cfg.train.auto_resume:
-        start_epoch = load_ckpt(model, optimizer, scheduler,
-                                cfg.train.epoch_resume)
+        start_epoch = load_ckpt(model, optimizer, scheduler, cfg.train.epoch_resume)
     if start_epoch == cfg.optim.max_epoch:
-        logging.info('Checkpoint found, Task already done')
+        logging.info("Checkpoint found, Task already done")
     else:
-        logging.info('Start from epoch %s', start_epoch)
+        logging.info("Start from epoch %s", start_epoch)
 
     num_splits = len(loggers)
     for cur_epoch in range(start_epoch, cfg.optim.max_epoch):
@@ -73,4 +74,4 @@ def train_example(loggers, loaders, model, optimizer, scheduler):
     if cfg.train.ckpt_clean:
         clean_ckpt()
 
-    logging.info('Task done, results saved in %s', cfg.run_dir)
+    logging.info("Task done, results saved in %s", cfg.run_dir)

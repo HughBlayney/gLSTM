@@ -1,0 +1,48 @@
+program: main.py
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - --cfg
+  - configs/GNN-xLSTM/peptides-struct-GNN-xLSTM.yaml
+  - wandb.use
+  - True
+  - gnn.shared
+  - False
+  - wandb.sweep_hacks
+  - True
+  - ${args_no_hyphens}
+  - optim.early_stopping_patience
+  - 40
+  - out_dir
+  - sweeps/results
+
+method: bayes
+metric:
+  name: best/val_mae
+  goal: minimize
+
+parameters:
+  xlstm.memory_dim:
+    values: [8, 16, 32]
+  xlstm.num_heads:
+    max: 8
+    min: 1
+    distribution: int_uniform
+  gnn.layers_mp:
+    max: 40
+    min: 4
+    distribution: int_uniform
+  gnn.act:
+    values: [gelu, relu, none]
+  xlstm.dropout:
+    values: [None, 0.1, 0.2]
+  xlstm.input_norm_type:
+    values: [layer, none]
+  
+early_terminate:
+  type: hyperband
+  s: 2
+  eta: 3
+  max_iter: 108
+  

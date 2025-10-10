@@ -2,7 +2,7 @@ from torch_geometric.graphgym.register import register_config
 from yacs.config import CfgNode as CN
 
 
-@register_config('cfg_graphormer')
+@register_config("cfg_graphormer")
 def set_cfg_gt(cfg):
     cfg.graphormer = CN()
     cfg.graphormer.num_layers = 6

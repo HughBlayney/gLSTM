@@ -4,13 +4,17 @@ from torch_geometric.graphgym.config import cfg
 from torch_geometric.graphgym.register import register_loss
 
 
-@register_loss('weighted_cross_entropy')
+@register_loss("weighted_cross_entropy")
 def weighted_cross_entropy(pred, true):
-    """Weighted cross-entropy for unbalanced classes.
-    """
-    if cfg.model.loss_fun == 'weighted_cross_entropy':
+    """Weighted cross-entropy for unbalanced classes."""
+    if cfg.model.loss_fun == "weighted_cross_entropy":
         # calculating label weights for weighted loss computation
         V = true.size(0)
+        # For whatever reason, the codebase I have seems to have pred in a different
+        # shape to that which is expected. I am getting binary predictions with shape
+        # (N, 1) when the codebase seems to expect (N,). Therefore I catch this here
+        if pred.ndim == 2 and pred.shape[1] == 1:
+            pred = pred.squeeze(1)
         n_classes = pred.shape[1] if pred.ndim > 1 else 2
         label_count = torch.bincount(true)
         label_count = label_count[label_count.nonzero(as_tuple=True)].squeeze()
@@ -24,6 +28,7 @@ def weighted_cross_entropy(pred, true):
             return F.nll_loss(pred, true, weight=weight), pred
         # binary
         else:
-            loss = F.binary_cross_entropy_with_logits(pred, true.float(),
-                                                      weight=weight[true])
+            loss = F.binary_cross_entropy_with_logits(
+                pred, true.float(), weight=weight[true]
+            )
             return loss, torch.sigmoid(pred)

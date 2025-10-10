@@ -1,0 +1,41 @@
+out_dir: results
+metric_best: mse
+metric_agg: argmin
+wandb:
+  use: False
+  project: graph-transfer
+dataset:
+  format: custom
+  name: graph-transfer_ring
+  task: graph
+  task_type: regression
+  transductive: False
+  node_encoder: True
+  node_encoder_name: LinearNode
+  edge_encoder: False
+train:
+  mode: custom
+  batch_size: 64
+  eval_period: 1
+  ckpt_best: True
+  ckpt_clean: True
+model:
+  type: custom_gnn
+  loss_fun: mse
+gnn:
+  head: inductive_node
+  layers_mp: 3
+  layers_post_mp: 1
+  dim_inner: 64
+  layer_type: gcnconv
+  act: tanh
+  residual: False
+  batchnorm: False
+  normalize_adj: True
+optim:
+  optimizer: adamW
+  weight_decay: 0.0
+  base_lr: 0.001
+  max_epoch: 2000
+  scheduler: None
+  early_stopping_patience: 200

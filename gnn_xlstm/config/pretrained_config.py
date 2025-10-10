@@ -2,10 +2,9 @@ from torch_geometric.graphgym.register import register_config
 from yacs.config import CfgNode as CN
 
 
-@register_config('cfg_pretrained')
+@register_config("cfg_pretrained")
 def set_cfg_pretrained(cfg):
-    """Configuration options for loading a pretrained model.
-    """
+    """Configuration options for loading a pretrained model."""
 
     cfg.pretrained = CN()
 

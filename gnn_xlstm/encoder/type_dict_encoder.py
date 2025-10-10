@@ -1,7 +1,9 @@
 import torch
 from torch_geometric.graphgym.config import cfg
-from torch_geometric.graphgym.register import (register_node_encoder,
-                                               register_edge_encoder)
+from torch_geometric.graphgym.register import (
+    register_edge_encoder,
+    register_node_encoder,
+)
 
 """
 Generic Node and Edge encoders for datasets with node/edge features that
@@ -78,7 +80,7 @@ Edge labels:
 """
 
 
-@register_node_encoder('TypeDictNode')
+@register_node_encoder("TypeDictNode")
 class TypeDictNodeEncoder(torch.nn.Module):
     def __init__(self, emb_dim):
         super().__init__()
@@ -87,8 +89,9 @@ class TypeDictNodeEncoder(torch.nn.Module):
         if num_types < 1:
             raise ValueError(f"Invalid 'node_encoder_num_types': {num_types}")
 
-        self.encoder = torch.nn.Embedding(num_embeddings=num_types,
-                                          embedding_dim=emb_dim)
+        self.encoder = torch.nn.Embedding(
+            num_embeddings=num_types, embedding_dim=emb_dim
+        )
         # torch.nn.init.xavier_uniform_(self.encoder.weight.data)
 
     def forward(self, batch):
@@ -98,7 +101,7 @@ class TypeDictNodeEncoder(torch.nn.Module):
         return batch
 
 
-@register_edge_encoder('TypeDictEdge')
+@register_edge_encoder("TypeDictEdge")
 class TypeDictEdgeEncoder(torch.nn.Module):
     def __init__(self, emb_dim):
         super().__init__()
@@ -107,8 +110,9 @@ class TypeDictEdgeEncoder(torch.nn.Module):
         if num_types < 1:
             raise ValueError(f"Invalid 'edge_encoder_num_types': {num_types}")
 
-        self.encoder = torch.nn.Embedding(num_embeddings=num_types,
-                                          embedding_dim=emb_dim)
+        self.encoder = torch.nn.Embedding(
+            num_embeddings=num_types, embedding_dim=emb_dim
+        )
         # torch.nn.init.xavier_uniform_(self.encoder.weight.data)
 
     def forward(self, batch):

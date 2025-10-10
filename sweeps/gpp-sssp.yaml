@@ -1,0 +1,38 @@
+program: main.py
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - --cfg
+  - configs/GNN-xLSTM/gpp-sssp-GNN-xLSTM.yaml
+  - wandb.use
+  - True
+  - gnn.shared
+  - False
+  - wandb.sweep_hacks
+  - True
+  - ${args_no_hyphens}
+  - optim.early_stopping_patience
+  - 20
+  - out_dir
+  - sweeps/results
+
+method: grid
+metric:
+  name: best/val_log_10_mse
+  goal: minimize
+
+parameters:
+  xlstm.memory_dim:
+    values: [8, 16]
+  xlstm.num_heads:
+    max: 4
+    min: 1
+    distribution: int_uniform
+  gnn.layers_mp:
+    values: [1, 5, 10, 20]
+  gnn.dim_inner:
+    values: [10, 20, 30]
+  gnn.act:
+    values: [tanh, relu, none]
+  

@@ -1,0 +1,75 @@
+out_dir: results/lrgb
+metric_best: ap
+wandb:
+  use: True
+  project: peptides-functional
+dataset:
+  format: OGB
+  name: peptides-functional
+  task: graph
+  task_type: classification_multilabel
+  transductive: False
+  node_encoder: True
+  node_encoder_name: Atom+RWSE
+  node_encoder_bn: False
+  edge_encoder: True
+  edge_encoder_name: Bond
+  edge_encoder_bn: False
+posenc_RWSE:
+  enable: True
+  kernel:
+    times_func: range(1,21)
+  model: Linear
+  dim_pe: 28
+  raw_norm_type: BatchNorm
+posenc_LapPE:
+  enable: False
+  eigen:
+    laplacian_norm: none
+    eigvec_norm: L2
+    max_freqs: 10
+  model: DeepSet
+  dim_pe: 16
+  layers: 2
+  raw_norm_type: none
+train:
+  mode: custom
+  batch_size: 64
+  eval_period: 1
+  ckpt_best: True
+  ckpt_clean: True
+  parameter_limit: 500000
+  dependent_parameter: gnn.dim_inner # mlstm.hidden_dim
+model:
+  type: gnn_xlstm
+  loss_fun: cross_entropy
+  graph_pooling: mean
+gnn:
+  dim_inner: 512 # Careful - you can't make this too small or it'll start causing problems with the size of the PE embeddings
+  layers_mp: 27
+  layers_post_mp: 1
+  batchnorm: False
+  act: none
+  shared: False
+  use_k_hop_aggregation: True
+xlstm:
+  num_blocks: 1
+  num_heads: 2
+  memory_dim: 32
+  aggr: add
+  input_norm_type: layer # careful - this cannot be group
+  hidden_norm_type: group
+  input_gate_type: ego
+  dropout: 0.1
+optim:
+  clip_grad_norm: True
+  optimizer: adamW
+  weight_decay: 0.0
+  base_lr: 0.001
+  max_epoch: 1500
+  scheduler: reduce_on_plateau
+  num_warmup_epochs: 5
+  reduce_factor: 0.5
+  schedule_patience: 20
+  min_lr: 1e-5
+  early_stopping_patience: 100

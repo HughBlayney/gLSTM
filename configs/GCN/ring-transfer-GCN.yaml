@@ -1,0 +1,44 @@
+out_dir: results/ring_transfer
+metric_best: accuracy
+wandb:
+  use: False
+  project: ring-transfer
+dataset:
+  format: custom
+  name: ring-transfer
+  task: graph
+  task_type: classification
+  transductive: False
+  node_encoder: True
+  node_encoder_name: LinearNode
+  edge_encoder: False
+train:
+  mode: custom
+  batch_size: 16
+  eval_period: 1
+  ckpt_best: True
+  ckpt_clean: True
+model:
+  type: custom_gnn
+  loss_fun: cross_entropy
+  graph_pooling: add
+gnn:
+  head: ring-transfer
+  layers_mp: 40
+  layers_post_mp: 1
+  dim_inner: 64
+  layer_type: gcnconv
+  act: gelu
+  residual: False
+  batchnorm: False
+optim:
+  clip_grad_norm: True
+  optimizer: adamW
+  weight_decay: 0.0
+  base_lr: 0.0005
+  min_lr: 1e-5
+  max_epoch: 200
+  scheduler: cosine_with_warmup
+  num_warmup_epochs: 5
+  early_stopping_loss_threshold: 0.001
+  early_stopping_patience: 60

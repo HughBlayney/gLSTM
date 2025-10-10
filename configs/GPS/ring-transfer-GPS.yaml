@@ -1,0 +1,48 @@
+out_dir: results
+metric_best: accuracy
+wandb:
+  use: False
+  project: ring-transfer
+dataset:
+  format: custom
+  name: ring-transfer
+  task: graph
+  task_type: classification
+  transductive: False
+  node_encoder: True
+  node_encoder_name: LinearNode
+  edge_encoder: False
+train:
+  mode: custom
+  batch_size: 32
+  eval_period: 1
+  ckpt_period: 100
+model:
+  type: GPSModel
+  loss_fun: cross_entropy
+  graph_pooling: add
+gt:
+  layer_type: GCN+Transformer
+  layers: 3
+  n_heads: 1
+  dim_hidden: 32  # `gt.dim_hidden` must match `gnn.dim_inner`
+  layer_norm: True
+  batch_norm: False
+gnn:
+  head: ring-transfer
+  layers_post_mp: 1
+  dim_inner: 32
+  act: gelu
+  agg: mean
+  normalize_adj: False
+optim:
+  clip_grad_norm: True
+  optimizer: adamW
+  weight_decay: 0.0
+  base_lr: 0.0005
+  min_lr: 1e-5
+  max_epoch: 200
+  scheduler: cosine_with_warmup
+  num_warmup_epochs: 5
+  early_stopping_loss_threshold: 0.001
+  early_stopping_patience: 60

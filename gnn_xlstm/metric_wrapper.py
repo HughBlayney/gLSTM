@@ -1,21 +1,21 @@
 import operator as op
-from copy import deepcopy
-from typing import Union, Callable, Optional, Dict, Any
 import warnings
+from copy import deepcopy
+from typing import Any, Callable, Dict, Optional, Union
 
 import torch
 from torchmetrics.functional import (
     accuracy,
+    auroc,
     average_precision,
     confusion_matrix,
     f1_score,
     fbeta_score,
-    precision_recall_curve,
-    precision,
-    recall,
-    auroc,
     mean_absolute_error,
     mean_squared_error,
+    precision,
+    precision_recall_curve,
+    recall,
 )
 from torchmetrics.utilities import reduce
 
@@ -54,8 +54,10 @@ class Thresholder:
         elif operator is None:
             pass
         else:
-            raise TypeError(f"operator must be either `str` or `callable`, "
-                            f"provided: `{type(operator)}`")
+            raise TypeError(
+                f"operator must be either `str` or `callable`, "
+                f"provided: `{type(operator)}`"
+            )
 
         self.operator = operator
         self.op_str = op_str
@@ -85,8 +87,9 @@ class Thresholder:
         return f"{self.op_str}{self.threshold}"
 
 
-def pearsonr(preds: torch.Tensor, target: torch.Tensor,
-             reduction: str = "elementwise_mean") -> torch.Tensor:
+def pearsonr(
+    preds: torch.Tensor, target: torch.Tensor, reduction: str = "elementwise_mean"
+) -> torch.Tensor:
     r"""
     Computes the pearsonr correlation.
 
@@ -115,8 +118,8 @@ def pearsonr(preds: torch.Tensor, target: torch.Tensor,
 
     shifted_x = preds - torch.mean(preds, dim=0)
     shifted_y = target - torch.mean(target, dim=0)
-    sigma_x = torch.sqrt(torch.sum(shifted_x ** 2, dim=0))
-    sigma_y = torch.sqrt(torch.sum(shifted_y ** 2, dim=0))
+    sigma_x = torch.sqrt(torch.sum(shifted_x**2, dim=0))
+    sigma_y = torch.sqrt(torch.sum(shifted_y**2, dim=0))
 
     pearson = torch.sum(shifted_x * shifted_y, dim=0) / (sigma_x * sigma_y + EPS)
     pearson = torch.clamp(pearson, min=-1, max=1)
@@ -126,8 +129,7 @@ def pearsonr(preds: torch.Tensor, target: torch.Tensor,
 
 def _get_rank(values):
 
-    arange = torch.arange(values.shape[0],
-                          dtype=values.dtype, device=values.device)
+    arange = torch.arange(values.shape[0], dtype=values.dtype, device=values.device)
 
     val_sorter = torch.argsort(values, dim=0)
     val_rank = torch.empty_like(values)
@@ -137,14 +139,17 @@ def _get_rank(values):
         for ii in range(val_rank.shape[1]):
             val_rank[val_sorter[:, ii], ii] = arange
     else:
-        raise ValueError(f"Only supports tensors of dimensions 1 and 2, "
-                         f"provided dim=`{values.ndim}`")
+        raise ValueError(
+            f"Only supports tensors of dimensions 1 and 2, "
+            f"provided dim=`{values.ndim}`"
+        )
 
     return val_rank
 
 
-def spearmanr(preds: torch.Tensor, target: torch.Tensor,
-              reduction: str = "elementwise_mean") -> torch.Tensor:
+def spearmanr(
+    preds: torch.Tensor, target: torch.Tensor, reduction: str = "elementwise_mean"
+) -> torch.Tensor:
     r"""
     Computes the spearmanr correlation.
 
@@ -271,8 +276,12 @@ class MetricWrapper:
             target = target[~target_nans]
             preds = preds[~target_nans]
         elif self.target_nan_mask == "ignore-mean-label":
-            target_list = [target[..., ii][~target_nans[..., ii]] for ii in range(target.shape[-1])]
-            preds_list = [preds[..., ii][~target_nans[..., ii]] for ii in range(preds.shape[-1])]
+            target_list = [
+                target[..., ii][~target_nans[..., ii]] for ii in range(target.shape[-1])
+            ]
+            preds_list = [
+                preds[..., ii][~target_nans[..., ii]] for ii in range(preds.shape[-1])
+            ]
             target = target_list
             preds = preds_list
         else:
@@ -285,8 +294,8 @@ class MetricWrapper:
             for ii in range(len(target)):
                 try:
                     kwargs = self.kwargs.copy()
-                    if 'cast_to_int' in kwargs and kwargs['cast_to_int']:
-                        del kwargs['cast_to_int']
+                    if "cast_to_int" in kwargs and kwargs["cast_to_int"]:
+                        del kwargs["cast_to_int"]
                         res = self.metric(preds[ii], target[ii].int(), **kwargs)
                     else:
                         res = self.metric(preds[ii], target[ii], **kwargs)
@@ -298,9 +307,11 @@ class MetricWrapper:
                     # Catching the Warning risen by torchmetrics.functional.auroc
                     # already prevents the 0 to be appended, nothing else needs
                     # to be done.
-                    if str(e) == 'No positive samples in targets, ' \
-                                 'true positive value should be meaningless. ' \
-                                 'Returning zero tensor in true positive score':
+                    if (
+                        str(e) == "No positive samples in targets, "
+                        "true positive value should be meaningless. "
+                        "Returning zero tensor in true positive score"
+                    ):
                         pass
                     else:
                         print(e)

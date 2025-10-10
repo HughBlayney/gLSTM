@@ -1,11 +1,10 @@
 import torch
-
 import torch_geometric.graphgym.register as register
 from torch_geometric.graphgym import cfg
 from torch_geometric.graphgym.register import register_head
 
 
-@register_head('graphormer_graph')
+@register_head("graphormer_graph")
 class GraphormerHead(torch.nn.Module):
     """
     Graphormer prediction head for graph prediction tasks.
@@ -21,9 +20,7 @@ class GraphormerHead(torch.nn.Module):
         self.pooling_fun = register.pooling_dict[cfg.model.graph_pooling]
 
         self.ln = torch.nn.LayerNorm(dim_in)
-        self.layers = torch.nn.Sequential(
-            torch.nn.Linear(dim_in, dim_out)
-        )
+        self.layers = torch.nn.Sequential(torch.nn.Linear(dim_in, dim_out))
 
     def _apply_index(self, batch):
         return batch.graph_feature, batch.y

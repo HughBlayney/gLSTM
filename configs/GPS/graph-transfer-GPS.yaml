@@ -1,0 +1,44 @@
+out_dir: results
+metric_best: mse
+metric_agg: argmin
+wandb:
+  use: False
+  project: graph-transfer
+dataset:
+  format: custom
+  name: graph-transfer_ring
+  task: graph
+  task_type: regression
+  transductive: False
+  node_encoder: True
+  node_encoder_name: LinearNode
+  edge_encoder: False
+train:
+  mode: custom
+  batch_size: 64
+  eval_period: 1
+  ckpt_period: 20
+model:
+  type: GPSModel
+  loss_fun: mse
+gt:
+  layer_type: GCN+Transformer
+  layers: 3
+  n_heads: 1
+  dim_hidden: 32  # `gt.dim_hidden` must match `gnn.dim_inner`
+  layer_norm: True
+  batch_norm: False
+gnn:
+  head: inductive_node
+  layers_post_mp: 1
+  dim_inner: 32
+  act: gelu
+  agg: mean
+  normalize_adj: False
+optim:
+  optimizer: adamW
+  weight_decay: 0.0
+  base_lr: 0.001
+  max_epoch: 1500
+  scheduler: None
+  early_stopping_patience: 200

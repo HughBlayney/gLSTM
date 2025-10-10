@@ -4,7 +4,7 @@ from torch_geometric.graphgym import cfg
 from torch_geometric.graphgym.register import register_head
 
 
-@register_head('mlp_graph')
+@register_head("mlp_graph")
 class MLPGraphHead(nn.Module):
     """
     MLP prediction head for graph prediction tasks.
@@ -17,18 +17,18 @@ class MLPGraphHead(nn.Module):
 
     def __init__(self, dim_in, dim_out):
         super().__init__()
-        if cfg.model.graph_pooling != 'node_ensemble':
+        if cfg.model.graph_pooling != "node_ensemble":
             self.pooling_fun = register.pooling_dict[cfg.model.graph_pooling]
             self.node_ensemble = False
         else:
-            self.pooling_fun = register.pooling_dict['mean']
+            self.pooling_fun = register.pooling_dict["mean"]
             self.node_ensemble = True
 
         dropout = cfg.gnn.dropout
         L = cfg.gnn.layers_post_mp
 
         layers = []
-        for _ in range(L-1):
+        for _ in range(L - 1):
             layers.append(nn.Dropout(dropout))
             layers.append(nn.Linear(dim_in, dim_in, bias=True))
             layers.append(register.act_dict[cfg.gnn.act]())
@@ -67,14 +67,14 @@ class MLPGraphHead(nn.Module):
             return pred, label
 
 
-@register_head('mlp_graph_pcqm4m')
+@register_head("mlp_graph_pcqm4m")
 class MLPGraphHeadPCQM4M(MLPGraphHead):
 
     def _scale_and_shift(self, x):
         return (x * 1.1623) + 5.6896
 
 
-@register_head('mlp_graph_zinc')
+@register_head("mlp_graph_zinc")
 class MLPGraphHeadZINC(MLPGraphHead):
 
     def _scale_and_shift(self, x):

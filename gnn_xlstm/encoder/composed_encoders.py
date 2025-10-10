@@ -1,21 +1,28 @@
 import torch
 from torch_geometric.graphgym.config import cfg
 from torch_geometric.graphgym.models.encoder import AtomEncoder, BondEncoder
-from torch_geometric.graphgym.register import register_node_encoder, register_edge_encoder
+from torch_geometric.graphgym.register import (
+    register_edge_encoder,
+    register_node_encoder,
+)
 
-from graphgps.encoder.ast_encoder import ASTNodeEncoder
-from graphgps.encoder.kernel_pos_encoder import RWSENodeEncoder, \
-    HKdiagSENodeEncoder, ElstaticSENodeEncoder
-from graphgps.encoder.laplace_pos_encoder import LapPENodeEncoder
-from graphgps.encoder.ppa_encoder import PPANodeEncoder
-from graphgps.encoder.signnet_pos_encoder import SignNetNodeEncoder
-from graphgps.encoder.voc_superpixels_encoder import VOCNodeEncoder, COCONodeEncoder
-from graphgps.encoder.type_dict_encoder import TypeDictNodeEncoder, TypeDictEdgeEncoder
-from graphgps.encoder.linear_node_encoder import LinearNodeEncoder
-from graphgps.encoder.equivstable_laplace_pos_encoder import EquivStableLapPENodeEncoder
-from graphgps.encoder.graphormer_encoder import GraphormerEncoder
-
-from graphgps.encoder.rwse_edge_encoder import RWSEEdgeEncoder
+from gnn_xlstm.encoder.ast_encoder import ASTNodeEncoder
+from gnn_xlstm.encoder.equivstable_laplace_pos_encoder import (
+    EquivStableLapPENodeEncoder,
+)
+from gnn_xlstm.encoder.graphormer_encoder import GraphormerEncoder
+from gnn_xlstm.encoder.kernel_pos_encoder import (
+    ElstaticSENodeEncoder,
+    HKdiagSENodeEncoder,
+    RWSENodeEncoder,
+)
+from gnn_xlstm.encoder.laplace_pos_encoder import LapPENodeEncoder
+from gnn_xlstm.encoder.linear_node_encoder import LinearNodeEncoder
+from gnn_xlstm.encoder.ppa_encoder import PPANodeEncoder
+from gnn_xlstm.encoder.rwse_edge_encoder import RWSEEdgeEncoder
+from gnn_xlstm.encoder.signnet_pos_encoder import SignNetNodeEncoder
+from gnn_xlstm.encoder.type_dict_encoder import TypeDictEdgeEncoder, TypeDictNodeEncoder
+from gnn_xlstm.encoder.voc_superpixels_encoder import COCONodeEncoder, VOCNodeEncoder
 
 
 def concat_node_encoders(encoder_classes, pe_enc_names):
@@ -35,21 +42,35 @@ def concat_node_encoders(encoder_classes, pe_enc_names):
     """
 
     class Concat2NodeEncoder(torch.nn.Module):
-        """Encoder that concatenates two node encoders.
-        """
+        """Encoder that concatenates two node encoders."""
+
         enc1_cls = None
         enc2_cls = None
         enc2_name = None
 
         def __init__(self, dim_emb):
             super().__init__()
-            
-            if cfg.posenc_EquivStableLapPE.enable: # Special handling for Equiv_Stable LapPE where node feats and PE are not concat
+
+            if (
+                cfg.posenc_EquivStableLapPE.enable
+            ):  # Special handling for Equiv_Stable LapPE where node feats and PE are not concat
                 self.encoder1 = self.enc1_cls(dim_emb)
                 self.encoder2 = self.enc2_cls(dim_emb)
             else:
                 # PE dims can only be gathered once the cfg is loaded.
                 enc2_dim_pe = getattr(cfg, f"posenc_{self.enc2_name}").dim_pe
+
+                # Avoid negative dims here by capping enc2_dim_pe at half of dim_emb
+                min_dim_pe = dim_emb // 2
+                if enc2_dim_pe > min_dim_pe:
+                    enc2_dim_pe = min_dim_pe
+                    print(
+                        f"Warning: enc2_dim_pe ({enc2_dim_pe}) is greater than half of "
+                        + f"dim_emb ({dim_emb}). Capping enc2_dim_pe at {min_dim_pe}."
+                    )
+                    setattr(
+                        getattr(cfg, f"posenc_{self.enc2_name}"), "dim_pe", min_dim_pe
+                    )
 
                 self.encoder1 = self.enc1_cls(dim_emb - enc2_dim_pe)
                 self.encoder2 = self.enc2_cls(dim_emb, expand_x=False)
@@ -60,8 +81,8 @@ def concat_node_encoders(encoder_classes, pe_enc_names):
             return batch
 
     class Concat3NodeEncoder(torch.nn.Module):
-        """Encoder that concatenates three node encoders.
-        """
+        """Encoder that concatenates three node encoders."""
+
         enc1_cls = None
         enc2_cls = None
         enc2_name = None
@@ -97,64 +118,74 @@ def concat_node_encoders(encoder_classes, pe_enc_names):
         Concat3NodeEncoder.enc3_name = pe_enc_names[1]
         return Concat3NodeEncoder
     else:
-        raise ValueError(f"Does not support concatenation of "
-                         f"{len(encoder_classes)} encoder classes.")
+        raise ValueError(
+            f"Does not support concatenation of "
+            f"{len(encoder_classes)} encoder classes."
+        )
 
 
 # Dataset-specific node encoders.
-ds_encs = {'Atom': AtomEncoder,
-           'ASTNode': ASTNodeEncoder,
-           'PPANode': PPANodeEncoder,
-           'TypeDictNode': TypeDictNodeEncoder,
-           'VOCNode': VOCNodeEncoder,
-           'COCONode': COCONodeEncoder,
-           'LinearNode': LinearNodeEncoder}
+ds_encs = {
+    "Atom": AtomEncoder,
+    "ASTNode": ASTNodeEncoder,
+    "PPANode": PPANodeEncoder,
+    "TypeDictNode": TypeDictNodeEncoder,
+    "VOCNode": VOCNodeEncoder,
+    "COCONode": COCONodeEncoder,
+    "LinearNode": LinearNodeEncoder,
+}
 
 # Positional Encoding node encoders.
-pe_encs = {'LapPE': LapPENodeEncoder,
-           'RWSE': RWSENodeEncoder,
-           'HKdiagSE': HKdiagSENodeEncoder,
-           'ElstaticSE': ElstaticSENodeEncoder,
-           'SignNet': SignNetNodeEncoder,
-           'EquivStableLapPE': EquivStableLapPENodeEncoder,
-           'GraphormerBias': GraphormerEncoder}
+pe_encs = {
+    "LapPE": LapPENodeEncoder,
+    "RWSE": RWSENodeEncoder,
+    "HKdiagSE": HKdiagSENodeEncoder,
+    "ElstaticSE": ElstaticSENodeEncoder,
+    "SignNet": SignNetNodeEncoder,
+    "EquivStableLapPE": EquivStableLapPENodeEncoder,
+    "GraphormerBias": GraphormerEncoder,
+}
 
 # Concat dataset-specific and PE encoders.
 for ds_enc_name, ds_enc_cls in ds_encs.items():
     for pe_enc_name, pe_enc_cls in pe_encs.items():
         register_node_encoder(
             f"{ds_enc_name}+{pe_enc_name}",
-            concat_node_encoders([ds_enc_cls, pe_enc_cls],
-                                 [pe_enc_name])
+            concat_node_encoders([ds_enc_cls, pe_enc_cls], [pe_enc_name]),
         )
 
 # Combine both LapPE and RWSE positional encodings.
 for ds_enc_name, ds_enc_cls in ds_encs.items():
     register_node_encoder(
         f"{ds_enc_name}+LapPE+RWSE",
-        concat_node_encoders([ds_enc_cls, LapPENodeEncoder, RWSENodeEncoder],
-                             ['LapPE', 'RWSE'])
+        concat_node_encoders(
+            [ds_enc_cls, LapPENodeEncoder, RWSENodeEncoder], ["LapPE", "RWSE"]
+        ),
     )
 
 # Combine both SignNet and RWSE positional encodings.
 for ds_enc_name, ds_enc_cls in ds_encs.items():
     register_node_encoder(
         f"{ds_enc_name}+SignNet+RWSE",
-        concat_node_encoders([ds_enc_cls, SignNetNodeEncoder, RWSENodeEncoder],
-                             ['SignNet', 'RWSE'])
+        concat_node_encoders(
+            [ds_enc_cls, SignNetNodeEncoder, RWSENodeEncoder], ["SignNet", "RWSE"]
+        ),
     )
 
 # Combine GraphormerBias with LapPE or RWSE positional encodings.
 for ds_enc_name, ds_enc_cls in ds_encs.items():
     register_node_encoder(
         f"{ds_enc_name}+GraphormerBias+LapPE",
-        concat_node_encoders([ds_enc_cls, GraphormerEncoder, LapPENodeEncoder],
-                             ['GraphormerBias', 'LapPE'])
+        concat_node_encoders(
+            [ds_enc_cls, GraphormerEncoder, LapPENodeEncoder],
+            ["GraphormerBias", "LapPE"],
+        ),
     )
     register_node_encoder(
         f"{ds_enc_name}+GraphormerBias+RWSE",
-        concat_node_encoders([ds_enc_cls, GraphormerEncoder, RWSENodeEncoder],
-                             ['GraphormerBias', 'RWSE'])
+        concat_node_encoders(
+            [ds_enc_cls, GraphormerEncoder, RWSENodeEncoder], ["GraphormerBias", "RWSE"]
+        ),
     )
 
 
@@ -175,8 +206,8 @@ def concat_edge_encoders(encoder_classes):
     """
 
     class Concat2EdgeEncoder(torch.nn.Module):
-        """Encoder that concatenates two node encoders.
-        """
+        """Encoder that concatenates two node encoders."""
+
         enc1_cls = None
         enc2_cls = None
 
@@ -199,17 +230,16 @@ def concat_edge_encoders(encoder_classes):
         Concat2EdgeEncoder.enc2_cls = encoder_classes[1]
         return Concat2EdgeEncoder
     else:
-        raise ValueError(f"Does not support concatenation of "
-                         f"{len(encoder_classes)} encoder classes.")
+        raise ValueError(
+            f"Does not support concatenation of "
+            f"{len(encoder_classes)} encoder classes."
+        )
 
 
-edge_encs = {
-    'Bond': BondEncoder,
-    'TypeDictEdge': TypeDictEdgeEncoder
-}
+edge_encs = {"Bond": BondEncoder, "TypeDictEdge": TypeDictEdgeEncoder}
 
 for edge_enc_name, edge_enc_cls in edge_encs.items():
     register_edge_encoder(
         f"{edge_enc_name}+RWSEEdge",
-        concat_edge_encoders([edge_enc_cls, RWSEEdgeEncoder])
+        concat_edge_encoders([edge_enc_cls, RWSEEdgeEncoder]),
     )

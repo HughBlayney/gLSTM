@@ -1,12 +1,16 @@
-from typing import Optional, Callable, List
-
-import os
 import glob
+import os
 import os.path as osp
+from typing import Callable, List, Optional
 
 import torch
-from torch_geometric.data import (InMemoryDataset, Data, download_url,
-                                  extract_tar, extract_zip)
+from torch_geometric.data import (
+    Data,
+    InMemoryDataset,
+    download_url,
+    extract_tar,
+    extract_zip,
+)
 from torch_geometric.utils import remove_isolated_nodes
 
 """
@@ -17,6 +21,7 @@ TODO: Delete and use PyG's version once it is part of a released version.
 At the time of writing this class is in the main PyG github branch but is not
  included in the current latest released version 2.0.2.
 """
+
 
 class MalNetTiny(InMemoryDataset):
     r"""The MalNet Tiny dataset from the
@@ -41,24 +46,28 @@ class MalNetTiny(InMemoryDataset):
             final dataset. (default: :obj:`None`)
     """
 
-    url = 'http://malnet.cc.gatech.edu/graph-data/malnet-graphs-tiny.tar.gz'
+    url = "http://malnet.cc.gatech.edu/graph-data/malnet-graphs-tiny.tar.gz"
     # 70/10/20 train, val, test split by type
-    split_url = 'http://malnet.cc.gatech.edu/split-info/split_info_tiny.zip'
+    split_url = "http://malnet.cc.gatech.edu/split-info/split_info_tiny.zip"
 
-    def __init__(self, root: str, transform: Optional[Callable] = None,
-                 pre_transform: Optional[Callable] = None,
-                 pre_filter: Optional[Callable] = None):
+    def __init__(
+        self,
+        root: str,
+        transform: Optional[Callable] = None,
+        pre_transform: Optional[Callable] = None,
+        pre_filter: Optional[Callable] = None,
+    ):
         super().__init__(root, transform, pre_transform, pre_filter)
-        self.data, self.slices = torch.load(self.processed_paths[0])
+        self.data, self.slices = torch.load(self.processed_paths[0], weights_only=False)
 
     @property
     def raw_file_names(self) -> List[str]:
-        folders = ['addisplay', 'adware', 'benign', 'downloader', 'trojan']
-        return [osp.join('malnet-graphs-tiny', folder) for folder in folders]
+        folders = ["addisplay", "adware", "benign", "downloader", "trojan"]
+        return [osp.join("malnet-graphs-tiny", folder) for folder in folders]
 
     @property
     def processed_file_names(self) -> List[str]:
-        return ['data.pt', 'split_dict.pt']
+        return ["data.pt", "split_dict.pt"]
 
     def download(self):
         path = download_url(self.url, self.raw_dir)
@@ -70,28 +79,29 @@ class MalNetTiny(InMemoryDataset):
 
     def process(self):
         data_list = []
-        split_dict = {'train': [], 'valid': [], 'test': []}
+        split_dict = {"train": [], "valid": [], "test": []}
 
-        parse = lambda f: set([x.split('/')[-1]
-                               for x in f.read().split('\n')[:-1]])  # -1 for empty line at EOF
-        split_dir = osp.join(self.raw_dir, 'split_info_tiny', 'type')
-        with open(osp.join(split_dir, 'train.txt'), 'r') as f:
+        parse = lambda f: set(
+            [x.split("/")[-1] for x in f.read().split("\n")[:-1]]
+        )  # -1 for empty line at EOF
+        split_dir = osp.join(self.raw_dir, "split_info_tiny", "type")
+        with open(osp.join(split_dir, "train.txt"), "r") as f:
             train_names = parse(f)
             assert len(train_names) == 3500
-        with open(osp.join(split_dir, 'val.txt'), 'r') as f:
+        with open(osp.join(split_dir, "val.txt"), "r") as f:
             val_names = parse(f)
             assert len(val_names) == 500
-        with open(osp.join(split_dir, 'test.txt'), 'r') as f:
+        with open(osp.join(split_dir, "test.txt"), "r") as f:
             test_names = parse(f)
             assert len(test_names) == 1000
 
         for y, raw_path in enumerate(self.raw_paths):
             raw_path = osp.join(raw_path, os.listdir(raw_path)[0])
-            filenames = glob.glob(osp.join(raw_path, '*.edgelist'))
+            filenames = glob.glob(osp.join(raw_path, "*.edgelist"))
 
             for filename in filenames:
-                with open(filename, 'r') as f:
-                    edges = f.read().split('\n')[5:-1]
+                with open(filename, "r") as f:
+                    edges = f.read().split("\n")[5:-1]
                 edge_index = [[int(s) for s in edge.split()] for edge in edges]
                 edge_index = torch.tensor(edge_index).t().contiguous()
                 # Remove isolated nodes, including those with only a self-loop
@@ -103,11 +113,11 @@ class MalNetTiny(InMemoryDataset):
                 ind = len(data_list) - 1
                 graph_id = osp.splitext(osp.basename(filename))[0]
                 if graph_id in train_names:
-                    split_dict['train'].append(ind)
+                    split_dict["train"].append(ind)
                 elif graph_id in val_names:
-                    split_dict['valid'].append(ind)
+                    split_dict["valid"].append(ind)
                 elif graph_id in test_names:
-                    split_dict['test'].append(ind)
+                    split_dict["test"].append(ind)
                 else:
                     raise ValueError(f'No split assignment for "{graph_id}".')
 
@@ -121,4 +131,4 @@ class MalNetTiny(InMemoryDataset):
         torch.save(split_dict, self.processed_paths[1])
 
     def get_idx_split(self):
-        return torch.load(self.processed_paths[1])
+        return torch.load(self.processed_paths[1], weights_only=False)

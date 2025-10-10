@@ -4,18 +4,26 @@ import time
 import numpy as np
 import torch
 from scipy.stats import stats
-from sklearn.metrics import accuracy_score, precision_score, recall_score, \
-    f1_score, roc_auc_score, mean_absolute_error, mean_squared_error, \
-    confusion_matrix
-from sklearn.metrics import r2_score
+from sklearn.metrics import (
+    accuracy_score,
+    confusion_matrix,
+    f1_score,
+    mean_absolute_error,
+    mean_squared_error,
+    precision_score,
+    r2_score,
+    recall_score,
+    roc_auc_score,
+    root_mean_squared_error,
+)
 from torch_geometric.graphgym import get_current_gpu_usage
 from torch_geometric.graphgym.config import cfg
-from torch_geometric.graphgym.logger import infer_task, Logger
+from torch_geometric.graphgym.logger import Logger, infer_task
 from torch_geometric.graphgym.utils.io import dict_to_json, dict_to_tb
 from torchmetrics.functional import auroc
 
-import graphgps.metrics_ogb as metrics_ogb
-from graphgps.metric_wrapper import MetricWrapper
+import gnn_xlstm.metrics_ogb as metrics_ogb
+from gnn_xlstm.metric_wrapper import MetricWrapper
 
 
 def accuracy_SBM(targets, pred_int):
@@ -50,14 +58,14 @@ class CustomLogger(Logger):
     # basic properties
     def basic(self):
         stats = {
-            'loss': round(self._loss / self._size_current, max(8, cfg.round)),
-            'lr': round(self._lr, max(8, cfg.round)),
-            'params': self._params,
-            'time_iter': round(self.time_iter(), cfg.round),
+            "loss": round(self._loss / self._size_current, max(8, cfg.round)),
+            "lr": round(self._lr, max(8, cfg.round)),
+            "params": self._params,
+            "time_iter": round(self.time_iter(), cfg.round),
         }
         gpu_memory = get_current_gpu_usage()
         if gpu_memory > 0:
-            stats['gpu_memory'] = gpu_memory
+            stats["gpu_memory"] = gpu_memory
         return stats
 
     # task properties
@@ -66,32 +74,37 @@ class CustomLogger(Logger):
         pred_score = torch.cat(self._pred)
         pred_int = self._get_pred_int(pred_score)
 
-        if true.shape[0] < 1e7:  # AUROC computation for very large datasets is too slow.
+        if (
+            true.shape[0] < 1e7
+        ):  # AUROC computation for very large datasets is too slow.
             # TorchMetrics AUROC on GPU if available.
-            auroc_score = auroc(pred_score.to(torch.device(cfg.accelerator)),
-                                true.to(torch.device(cfg.accelerator)),
-                                task='binary')
+            auroc_score = auroc(
+                pred_score.to(torch.device(cfg.accelerator)),
+                true.to(torch.device(cfg.accelerator)),
+                task="binary",
+            )
             if self.test_scores:
                 # SK-learn version.
                 try:
-                    r_a_score = roc_auc_score(true.cpu().numpy(),
-                                              pred_score.cpu().numpy())
+                    r_a_score = roc_auc_score(
+                        true.cpu().numpy(), pred_score.cpu().numpy()
+                    )
                 except ValueError:
                     r_a_score = 0.0
                 assert np.isclose(float(auroc_score), r_a_score)
         else:
-            auroc_score = 0.
+            auroc_score = 0.0
 
         reformat = lambda x: round(float(x), cfg.round)
         res = {
-            'accuracy': reformat(accuracy_score(true, pred_int)),
-            'precision': reformat(precision_score(true, pred_int)),
-            'recall': reformat(recall_score(true, pred_int)),
-            'f1': reformat(f1_score(true, pred_int)),
-            'auc': reformat(auroc_score),
+            "accuracy": reformat(accuracy_score(true, pred_int)),
+            "precision": reformat(precision_score(true, pred_int)),
+            "recall": reformat(recall_score(true, pred_int)),
+            "f1": reformat(f1_score(true, pred_int)),
+            "auc": reformat(auroc_score),
         }
-        if cfg.metric_best == 'accuracy-SBM':
-            res['accuracy-SBM'] = reformat(accuracy_SBM(true, pred_int))
+        if cfg.metric_best == "accuracy-SBM":
+            res["accuracy-SBM"] = reformat(accuracy_SBM(true, pred_int))
         return res
 
     def classification_multi(self):
@@ -100,27 +113,32 @@ class CustomLogger(Logger):
         reformat = lambda x: round(float(x), cfg.round)
 
         res = {
-            'accuracy': reformat(accuracy_score(true, pred_int)),
-            'f1': reformat(f1_score(true, pred_int,
-                                    average='macro', zero_division=0)),
+            "accuracy": reformat(accuracy_score(true, pred_int)),
+            "f1": reformat(f1_score(true, pred_int, average="macro", zero_division=0)),
         }
-        if cfg.metric_best == 'accuracy-SBM':
-            res['accuracy-SBM'] = reformat(accuracy_SBM(true, pred_int))
+        if cfg.metric_best == "accuracy-SBM":
+            res["accuracy-SBM"] = reformat(accuracy_SBM(true, pred_int))
         if true.shape[0] < 1e7:
             # AUROC computation for very large datasets runs out of memory.
             # TorchMetrics AUROC on GPU is much faster than sklearn for large ds
-            res['auc'] = reformat(auroc(pred_score.to(torch.device(cfg.accelerator)),
-                                        true.to(torch.device(cfg.accelerator)).squeeze(),
-                                        task='multiclass',
-                                        num_classes=pred_score.shape[1],
-                                        average='macro'))
+            res["auc"] = reformat(
+                auroc(
+                    pred_score.to(torch.device(cfg.accelerator)),
+                    true.to(torch.device(cfg.accelerator)).squeeze(),
+                    task="multiclass",
+                    num_classes=pred_score.shape[1],
+                    average="macro",
+                )
+            )
 
             if self.test_scores:
                 # SK-learn version.
-                sk_auc = reformat(roc_auc_score(true, pred_score.exp(),
-                                                average='macro',
-                                                multi_class='ovr'))
-                assert np.isclose(sk_auc, res['auc'])
+                sk_auc = reformat(
+                    roc_auc_score(
+                        true, pred_score.exp(), average="macro", multi_class="ovr"
+                    )
+                )
+                assert np.isclose(sk_auc, res["auc"])
 
         return res
 
@@ -129,19 +147,23 @@ class CustomLogger(Logger):
         reformat = lambda x: round(float(x), cfg.round)
 
         # MetricWrapper will remove NaNs and apply the metric to each target dim
-        acc = MetricWrapper(metric='accuracy',
-                            target_nan_mask='ignore-mean-label',
-                            task='binary',
-                            cast_to_int=True)
-        auroc = MetricWrapper(metric='auroc',
-                              target_nan_mask='ignore-mean-label',
-                              task='binary',
-                              cast_to_int=True)
+        acc = MetricWrapper(
+            metric="accuracy",
+            target_nan_mask="ignore-mean-label",
+            task="binary",
+            cast_to_int=True,
+        )
+        auroc = MetricWrapper(
+            metric="auroc",
+            target_nan_mask="ignore-mean-label",
+            task="binary",
+            cast_to_int=True,
+        )
         # Send to GPU to speed up TorchMetrics if possible.
-        true = true.to('cpu')
-        pred_score = pred_score.to('cpu')
+        true = true.to("cpu")
+        pred_score = pred_score.to("cpu")
         results = {
-            'accuracy': reformat(acc(torch.sigmoid(pred_score), true)),
+            "accuracy": reformat(acc(torch.sigmoid(pred_score), true)),
         }
 
         if true.shape[0] < 1e6:
@@ -149,31 +171,33 @@ class CustomLogger(Logger):
             #                    target_nan_mask='ignore-mean-label',
             #                    task='binary',
             #                    cast_to_int=True)
-            ogb_ap = reformat(metrics_ogb.eval_ap(true.cpu().numpy(),
-                                                  pred_score.cpu().numpy())['ap'])
-            results['auc'] = reformat(auroc(pred_score, true))
-            results['ap'] = ogb_ap
+            ogb_ap = reformat(
+                metrics_ogb.eval_ap(true.cpu().numpy(), pred_score.cpu().numpy())["ap"]
+            )
+            results["auc"] = reformat(auroc(pred_score, true))
+            results["ap"] = ogb_ap
 
         if self.test_scores:
             # Compute metric by OGB Evaluator methods.
             true = true.cpu().numpy()
             pred_score = pred_score.cpu().numpy()
             ogb = {
-                'accuracy': reformat(metrics_ogb.eval_acc(
-                    true, (pred_score > 0.).astype(int))['acc']),
-                'ap': reformat(metrics_ogb.eval_ap(true, pred_score)['ap']),
-                'auc': reformat(
-                    metrics_ogb.eval_rocauc(true, pred_score)['rocauc']),
+                "accuracy": reformat(
+                    metrics_ogb.eval_acc(true, (pred_score > 0.0).astype(int))["acc"]
+                ),
+                "ap": reformat(metrics_ogb.eval_ap(true, pred_score)["ap"]),
+                "auc": reformat(metrics_ogb.eval_rocauc(true, pred_score)["rocauc"]),
             }
-            assert np.isclose(ogb['accuracy'], results['accuracy'], atol=1e-05)
-            assert np.isclose(ogb['ap'], results['ap'], atol=1e-05)
-            assert np.isclose(ogb['auc'], results['auc'], atol=1e-05)
+            assert np.isclose(ogb["accuracy"], results["accuracy"], atol=1e-05)
+            assert np.isclose(ogb["ap"], results["ap"], atol=1e-05)
+            assert np.isclose(ogb["auc"], results["auc"], atol=1e-05)
 
         return results
 
     def subtoken_prediction(self):
         from ogb.graphproppred import Evaluator
-        evaluator = Evaluator('ogbg-code2')
+
+        evaluator = Evaluator("ogbg-code2")
 
         seq_ref_list = []
         seq_pred_list = []
@@ -183,40 +207,44 @@ class CustomLogger(Logger):
 
         input_dict = {"seq_ref": seq_ref_list, "seq_pred": seq_pred_list}
         result = evaluator.eval(input_dict)
-        result['f1'] = result['F1']
-        del result['F1']
+        result["f1"] = result["F1"]
+        del result["F1"]
         return result
 
     def regression(self):
         true, pred = torch.cat(self._true), torch.cat(self._pred)
         reformat = lambda x: round(float(x), cfg.round)
+        mse = mean_squared_error(true, pred)
         return {
-            'mae': reformat(mean_absolute_error(true, pred)),
-            'r2': reformat(r2_score(true, pred, multioutput='uniform_average')),
-            'spearmanr': reformat(eval_spearmanr(true.numpy(),
-                                                 pred.numpy())['spearmanr']),
-            'mse': reformat(mean_squared_error(true, pred)),
-            'rmse': reformat(mean_squared_error(true, pred, squared=False)),
+            "mae": reformat(mean_absolute_error(true, pred)),
+            "r2": reformat(r2_score(true, pred, multioutput="uniform_average")),
+            "spearmanr": reformat(
+                eval_spearmanr(true.numpy(), pred.numpy())["spearmanr"]
+            ),
+            "mse": reformat(mse),
+            "log_10_mse": reformat(np.log10(mse)),
+            "rmse": reformat(root_mean_squared_error(true, pred)),
         }
 
-    def update_stats(self, true, pred, loss, lr, time_used, params,
-                     dataset_name=None, **kwargs):
-        if dataset_name == 'ogbg-code2':
-            assert true['y_arr'].shape[1] == len(pred)  # max_seq_len (5)
-            assert true['y_arr'].shape[0] == pred[0].shape[0]  # batch size
-            batch_size = true['y_arr'].shape[0]
+    def update_stats(
+        self, true, pred, loss, lr, time_used, params, dataset_name=None, **kwargs
+    ):
+        if dataset_name == "ogbg-code2":
+            assert true["y_arr"].shape[1] == len(pred)  # max_seq_len (5)
+            assert true["y_arr"].shape[0] == pred[0].shape[0]  # batch size
+            batch_size = true["y_arr"].shape[0]
 
             # Decode the predicted sequence tokens, so we don't need to store
             # the logits that take significant memory.
-            from graphgps.loader.ogbg_code2_utils import idx2vocab, \
-                decode_arr_to_seq
+            from gnn_xlstm.loader.ogbg_code2_utils import decode_arr_to_seq, idx2vocab
+
             arr_to_seq = lambda arr: decode_arr_to_seq(arr, idx2vocab)
             mat = []
             for i in range(len(pred)):
                 mat.append(torch.argmax(pred[i].detach(), dim=1).view(-1, 1))
             mat = torch.cat(mat, dim=1)
             seq_pred = [arr_to_seq(arr) for arr in mat]
-            seq_ref = [true['y'][i] for i in range(len(true['y']))]
+            seq_ref = [true["y"][i] for i in range(len(true["y"]))]
             pred = seq_pred
             true = seq_ref
         else:
@@ -241,52 +269,53 @@ class CustomLogger(Logger):
         start_time = time.perf_counter()
         basic_stats = self.basic()
 
-        if self.task_type == 'regression':
+        if self.task_type == "regression":
             task_stats = self.regression()
-        elif self.task_type == 'classification_binary':
+        elif self.task_type == "classification_binary":
             task_stats = self.classification_binary()
-        elif self.task_type == 'classification_multi':
+        elif self.task_type == "classification_multi":
             task_stats = self.classification_multi()
-        elif self.task_type == 'classification_multilabel':
+        elif self.task_type == "classification_multilabel":
             task_stats = self.classification_multilabel()
-        elif self.task_type == 'subtoken_prediction':
+        elif self.task_type == "subtoken_prediction":
             task_stats = self.subtoken_prediction()
         else:
-            raise ValueError('Task has to be regression or classification')
+            raise ValueError("Task has to be regression or classification")
 
-        epoch_stats = {'epoch': cur_epoch,
-                       'time_epoch': round(self._time_used, cfg.round)}
-        eta_stats = {'eta': round(self.eta(cur_epoch), cfg.round),
-                     'eta_hours': round(self.eta(cur_epoch) / 3600, cfg.round)}
+        epoch_stats = {
+            "epoch": cur_epoch,
+            "time_epoch": round(self._time_used, cfg.round),
+        }
+        eta_stats = {
+            "eta": round(self.eta(cur_epoch), cfg.round),
+            "eta_hours": round(self.eta(cur_epoch) / 3600, cfg.round),
+        }
         custom_stats = self.custom()
 
-        if self.name == 'train':
+        if self.name == "train":
             stats = {
                 **epoch_stats,
                 **eta_stats,
                 **basic_stats,
                 **task_stats,
-                **custom_stats
+                **custom_stats,
             }
         else:
-            stats = {
-                **epoch_stats,
-                **basic_stats,
-                **task_stats,
-                **custom_stats
-            }
+            stats = {**epoch_stats, **basic_stats, **task_stats, **custom_stats}
 
         # print
-        logging.info('{}: {}'.format(self.name, stats))
+        logging.info("{}: {}".format(self.name, stats))
         # json
-        dict_to_json(stats, '{}/stats.json'.format(self.out_dir))
+        dict_to_json(stats, "{}/stats.json".format(self.out_dir))
         # tensorboard
         if cfg.tensorboard_each_run:
             dict_to_tb(stats, self.tb_writer, cur_epoch)
         self.reset()
         if cur_epoch < 3:
-            logging.info(f"...computing epoch stats took: "
-                         f"{time.perf_counter() - start_time:.2f}s")
+            logging.info(
+                f"...computing epoch stats took: "
+                f"{time.perf_counter() - start_time:.2f}s"
+            )
         return stats
 
 
@@ -298,15 +327,14 @@ def create_logger():
 
     """
     loggers = []
-    names = ['train', 'val', 'test']
+    names = ["train", "val", "test"]
     for i, dataset in enumerate(range(cfg.share.num_splits)):
         loggers.append(CustomLogger(name=names[i], task_type=infer_task()))
     return loggers
 
 
 def eval_spearmanr(y_true, y_pred):
-    """Compute Spearman Rho averaged across tasks.
-    """
+    """Compute Spearman Rho averaged across tasks."""
     res_list = []
 
     if y_true.ndim == 1:
@@ -315,7 +343,8 @@ def eval_spearmanr(y_true, y_pred):
         for i in range(y_true.shape[1]):
             # ignore nan values
             is_labeled = ~np.isnan(y_true[:, i])
-            res_list.append(stats.spearmanr(y_true[is_labeled, i],
-                                            y_pred[is_labeled, i])[0])
+            res_list.append(
+                stats.spearmanr(y_true[is_labeled, i], y_pred[is_labeled, i])[0]
+            )
 
-    return {'spearmanr': sum(res_list) / len(res_list)}
+    return {"spearmanr": sum(res_list) / len(res_list)}

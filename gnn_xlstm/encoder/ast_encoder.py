@@ -1,6 +1,8 @@
 import torch
-from torch_geometric.graphgym.register import (register_node_encoder,
-                                               register_edge_encoder)
+from torch_geometric.graphgym.register import (
+    register_edge_encoder,
+    register_node_encoder,
+)
 
 """
 === Description of the ogbg-code2 dataset ===
@@ -31,7 +33,7 @@ num_nodeattributes = 10030
 max_depth = 20
 
 
-@register_node_encoder('ASTNode')
+@register_node_encoder("ASTNode")
 class ASTNodeEncoder(torch.nn.Module):
     """The Abstract Syntax Tree (AST) Node Encoder used for ogbg-code2 dataset.
 
@@ -53,14 +55,19 @@ class ASTNodeEncoder(torch.nn.Module):
 
     def forward(self, batch):
         x = batch.x
-        depth = batch.node_depth.view(-1, )
+        depth = batch.node_depth.view(
+            -1,
+        )
         depth[depth > self.max_depth] = self.max_depth
-        batch.x = self.type_encoder(x[:, 0]) + self.attribute_encoder(x[:, 1]) \
-                  + self.depth_encoder(depth)
+        batch.x = (
+            self.type_encoder(x[:, 0])
+            + self.attribute_encoder(x[:, 1])
+            + self.depth_encoder(depth)
+        )
         return batch
 
 
-@register_edge_encoder('ASTEdge')
+@register_edge_encoder("ASTEdge")
 class ASTEdgeEncoder(torch.nn.Module):
     """The Abstract Syntax Tree (AST) Edge Encoder used for ogbg-code2 dataset.
 
@@ -79,7 +86,8 @@ class ASTEdgeEncoder(torch.nn.Module):
         self.embedding_direction = torch.nn.Embedding(2, emb_dim)
 
     def forward(self, batch):
-        embedding = self.embedding_type(batch.edge_attr[:, 0]) + \
-                    self.embedding_direction(batch.edge_attr[:, 1])
+        embedding = self.embedding_type(
+            batch.edge_attr[:, 0]
+        ) + self.embedding_direction(batch.edge_attr[:, 1])
         batch.edge_attr = embedding
         return batch

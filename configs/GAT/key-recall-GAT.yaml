@@ -1,0 +1,48 @@
+out_dir: results/key_recall
+metric_best: accuracy
+wandb:
+  use: False
+  project: key-recall
+dataset:
+  format: custom
+  name: key-recall
+  task: graph
+  task_type: classification
+  transductive: False
+  node_encoder: True
+  node_encoder_name: KeyRecall
+  edge_encoder: False
+  node_encoder_bn: False
+key_recall:
+  num_key_nodes: 8
+  num_classes: None
+  num_train_graphs: 8000
+  num_val_graphs: 1000
+  num_test_graphs: 1000
+train:
+  mode: custom
+  batch_size: 64
+  eval_period: 1
+  ckpt_best: True
+  ckpt_clean: True
+model:
+  type: custom_gnn
+  loss_fun: cross_entropy
+  graph_pooling: add
+gnn:
+  head: ring-transfer
+  dim_inner: 128
+  layers_mp: 2
+  layers_post_mp: 1
+  layer_type: gatv2conv
+  act: gelu
+  residual: False
+  batchnorm: False
+optim:
+  clip_grad_norm: True
+  optimizer: adamW
+  weight_decay: 0.0
+  base_lr: 0.001
+  max_epoch: 200
+  early_stopping_loss_threshold: 0.001
+  early_stopping_patience: 50

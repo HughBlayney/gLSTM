@@ -1,12 +1,12 @@
 import torch.nn as nn
+import torch_geometric.graphgym.register as register
 import torch_geometric.nn as pyg_nn
 from torch_geometric.graphgym import cfg
-import torch_geometric.graphgym.register as register
 
 
 class GCNConvLayer(nn.Module):
-    """Graph Isomorphism Network with Edge features (GINE) layer.
-    """
+    """Graph Isomorphism Network with Edge features (GINE) layer."""
+
     def __init__(self, dim_in, dim_out, dropout, residual):
         super().__init__()
         self.dim_in = dim_in

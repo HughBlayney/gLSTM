@@ -1,11 +1,11 @@
 import torch.nn as nn
-
 from torch_geometric.graphgym.register import register_head
 
 
-@register_head('head')
+@register_head("head")
 class ExampleNodeHead(nn.Module):
-    '''Head of GNN, node prediction'''
+    """Head of GNN, node prediction"""
+
     def __init__(self, dim_in, dim_out):
         super().__init__()
         self.layer_post_mp = nn.Linear(dim_in, dim_out, bias=True)
@@ -14,8 +14,10 @@ class ExampleNodeHead(nn.Module):
         if batch.node_label_index.shape[0] == batch.node_label.shape[0]:
             return batch.x[batch.node_label_index], batch.node_label
         else:
-            return batch.x[batch.node_label_index], \
-                   batch.node_label[batch.node_label_index]
+            return (
+                batch.x[batch.node_label_index],
+                batch.node_label[batch.node_label_index],
+            )
 
     def forward(self, batch):
         batch = self.layer_post_mp(batch)

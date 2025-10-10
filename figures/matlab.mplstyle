@@ -1,0 +1,30 @@
+lines.linewidth     : 3.0
+axes.grid           : True
+grid.linestyle      : :
+axes.grid.axis      : both
+axes.prop_cycle     : cycler('color', ['0071bc', '029e73', '949494', 'd55e00', '4cbded', 'a1132e', '8c564b', 'cc3939', 'fadd5f', 'f36196', '889717', 'a153bd'])
+xtick.top           : False
+xtick.minor.size    : 2
+xtick.direction     : out
+xtick.minor.visible : True
+ytick.right         : False
+ytick.minor.size    : 2
+ytick.direction     : out
+ytick.minor.visible : True
+legend.framealpha   : 1.0
+legend.edgecolor    : black
+legend.fancybox     : False
+figure.figsize      : 4.0, 4.0
+figure.dpi          : 72
+figure.autolayout   : False
+savefig.dpi         : 72
+savefig.format      : pdf
+savefig.bbox        : tight
+savefig.pad_inches  : 0.02
+savefig.transparent : True
+pdf.fonttype        : 42
+font.size           : 8
+font.family         : serif
+font.serif          : cmr10
+mathtext.fontset    : stix
+axes.unicode_minus  : False

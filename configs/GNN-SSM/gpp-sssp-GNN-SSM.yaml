@@ -1,0 +1,55 @@
+out_dir: results/gpp
+metric_best: log_10_mse
+metric_agg: argmin
+wandb:
+  use: False
+  project: graph-prop-pred
+dataset:
+  format: custom
+  name: graph-prop-pred_sssp
+  task: graph
+  task_type: regression
+  transductive: False
+  node_encoder: True
+  node_encoder_name: LinearNode
+  edge_encoder: False
+train:
+  mode: custom
+  batch_size: 64
+  eval_period: 1
+  ckpt_best: True
+  ckpt_clean: True
+model:
+  type: gnn_ssm
+  loss_fun: mse
+gnn:
+  head: inductive_node
+  dim_inner: 30 # Careful - you can't make this too small or it'll start causing problems with the size of the PE embeddings
+  layers_mp: 10
+  layers_post_mp: 1
+  batchnorm: False
+  act: tanh
+  shared: False
+  use_k_hop_aggregation: True
+ssm:
+  message_passing_activation_function: tanh
+  use_state_matrix: True
+  use_input_matrix: True
+  state_gating: False
+  input_gating: False
+  shared_state: True
+  shared_input: True
+  shared_gating: True
+  dyn: True
+  state_eigenvalue_magnitude: 0.75
+  input_eigenvalue_magnitude: None
+  train_state: False
+  train_input: False
+  conv_func: GCN
+optim:
+  optimizer: adam
+  weight_decay: 0.000001
+  base_lr: 0.003
+  max_epoch: 1500
+  scheduler: None
+  early_stopping_patience: 100

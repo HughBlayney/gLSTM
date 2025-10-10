@@ -2,6 +2,7 @@
 SignNet https://arxiv.org/abs/2202.13013
 based on https://github.com/cptq/SignNet-BasisNet
 """
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -12,34 +13,49 @@ from torch_scatter import scatter
 
 
 class MLP(nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels, num_layers,
-                 use_bn=False, use_ln=False, dropout=0.5, activation='relu',
-                 residual=False):
+    def __init__(
+        self,
+        in_channels,
+        hidden_channels,
+        out_channels,
+        num_layers,
+        use_bn=False,
+        use_ln=False,
+        dropout=0.5,
+        activation="relu",
+        residual=False,
+    ):
         super().__init__()
         self.lins = nn.ModuleList()
-        if use_bn: self.bns = nn.ModuleList()
-        if use_ln: self.lns = nn.ModuleList()
+        if use_bn:
+            self.bns = nn.ModuleList()
+        if use_ln:
+            self.lns = nn.ModuleList()
 
         if num_layers == 1:
             # linear mapping
             self.lins.append(nn.Linear(in_channels, out_channels))
         else:
             self.lins.append(nn.Linear(in_channels, hidden_channels))
-            if use_bn: self.bns.append(nn.BatchNorm1d(hidden_channels))
-            if use_ln: self.lns.append(nn.LayerNorm(hidden_channels))
+            if use_bn:
+                self.bns.append(nn.BatchNorm1d(hidden_channels))
+            if use_ln:
+                self.lns.append(nn.LayerNorm(hidden_channels))
             for layer in range(num_layers - 2):
                 self.lins.append(nn.Linear(hidden_channels, hidden_channels))
-                if use_bn: self.bns.append(nn.BatchNorm1d(hidden_channels))
-                if use_ln: self.lns.append(nn.LayerNorm(hidden_channels))
+                if use_bn:
+                    self.bns.append(nn.BatchNorm1d(hidden_channels))
+                if use_ln:
+                    self.lns.append(nn.LayerNorm(hidden_channels))
             self.lins.append(nn.Linear(hidden_channels, out_channels))
-        if activation == 'relu':
+        if activation == "relu":
             self.activation = nn.ReLU()
-        elif activation == 'elu':
+        elif activation == "elu":
             self.activation = nn.ELU()
-        elif activation == 'tanh':
+        elif activation == "tanh":
             self.activation = nn.Tanh()
         else:
-            raise ValueError('Invalid activation')
+            raise ValueError("Invalid activation")
         self.use_bn = use_bn
         self.use_ln = use_ln
         self.dropout = dropout
@@ -56,9 +72,11 @@ class MLP(nn.Module):
                 elif x.ndim == 3:
                     x = self.bns[i](x.transpose(2, 1)).transpose(2, 1)
                 else:
-                    raise ValueError('invalid dimension of x')
-            if self.use_ln: x = self.lns[i](x)
-            if self.residual and x_prev.shape == x.shape: x = x + x_prev
+                    raise ValueError("invalid dimension of x")
+            if self.use_ln:
+                x = self.lns[i](x)
+            if self.residual and x_prev.shape == x.shape:
+                x = x + x_prev
             x = F.dropout(x, p=self.dropout, training=self.training)
             x_prev = x
         x = self.lins[-1](x)
@@ -68,28 +86,59 @@ class MLP(nn.Module):
 
 
 class GIN(nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels, n_layers,
-                 use_bn=True, dropout=0.5, activation='relu'):
+    def __init__(
+        self,
+        in_channels,
+        hidden_channels,
+        out_channels,
+        n_layers,
+        use_bn=True,
+        dropout=0.5,
+        activation="relu",
+    ):
         super().__init__()
         self.layers = nn.ModuleList()
-        if use_bn: self.bns = nn.ModuleList()
+        if use_bn:
+            self.bns = nn.ModuleList()
         self.use_bn = use_bn
         # input layer
-        update_net = MLP(in_channels, hidden_channels, hidden_channels, 2,
-                         use_bn=use_bn, dropout=dropout, activation=activation)
+        update_net = MLP(
+            in_channels,
+            hidden_channels,
+            hidden_channels,
+            2,
+            use_bn=use_bn,
+            dropout=dropout,
+            activation=activation,
+        )
         self.layers.append(GINConv(update_net))
         # hidden layers
         for i in range(n_layers - 2):
-            update_net = MLP(hidden_channels, hidden_channels, hidden_channels,
-                             2, use_bn=use_bn, dropout=dropout,
-                             activation=activation)
+            update_net = MLP(
+                hidden_channels,
+                hidden_channels,
+                hidden_channels,
+                2,
+                use_bn=use_bn,
+                dropout=dropout,
+                activation=activation,
+            )
             self.layers.append(GINConv(update_net))
-            if use_bn: self.bns.append(nn.BatchNorm1d(hidden_channels))
+            if use_bn:
+                self.bns.append(nn.BatchNorm1d(hidden_channels))
         # output layer
-        update_net = MLP(hidden_channels, hidden_channels, out_channels, 2,
-                         use_bn=use_bn, dropout=dropout, activation=activation)
+        update_net = MLP(
+            hidden_channels,
+            hidden_channels,
+            out_channels,
+            2,
+            use_bn=use_bn,
+            dropout=dropout,
+            activation=activation,
+        )
         self.layers.append(GINConv(update_net))
-        if use_bn: self.bns.append(nn.BatchNorm1d(hidden_channels))
+        if use_bn:
+            self.bns.append(nn.BatchNorm1d(hidden_channels))
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x, edge_index):
@@ -102,54 +151,106 @@ class GIN(nn.Module):
                     elif x.ndim == 3:
                         x = self.bns[i - 1](x.transpose(2, 1)).transpose(2, 1)
                     else:
-                        raise ValueError('invalid x dim')
+                        raise ValueError("invalid x dim")
             x = layer(x, edge_index)
         return x
 
 
 class GINDeepSigns(nn.Module):
-    """ Sign invariant neural network with MLP aggregation.
-        f(v1, ..., vk) = rho(enc(v1) + enc(-v1), ..., enc(vk) + enc(-vk))
+    """Sign invariant neural network with MLP aggregation.
+    f(v1, ..., vk) = rho(enc(v1) + enc(-v1), ..., enc(vk) + enc(-vk))
     """
 
-    def __init__(self, in_channels, hidden_channels, out_channels, num_layers,
-                 k, dim_pe, rho_num_layers, use_bn=False, use_ln=False,
-                 dropout=0.5, activation='relu'):
+    def __init__(
+        self,
+        in_channels,
+        hidden_channels,
+        out_channels,
+        num_layers,
+        k,
+        dim_pe,
+        rho_num_layers,
+        use_bn=False,
+        use_ln=False,
+        dropout=0.5,
+        activation="relu",
+    ):
         super().__init__()
-        self.enc = GIN(in_channels, hidden_channels, out_channels, num_layers,
-                       use_bn=use_bn, dropout=dropout, activation=activation)
+        self.enc = GIN(
+            in_channels,
+            hidden_channels,
+            out_channels,
+            num_layers,
+            use_bn=use_bn,
+            dropout=dropout,
+            activation=activation,
+        )
         rho_dim = out_channels * k
-        self.rho = MLP(rho_dim, hidden_channels, dim_pe, rho_num_layers,
-                       use_bn=use_bn, dropout=dropout, activation=activation)
+        self.rho = MLP(
+            rho_dim,
+            hidden_channels,
+            dim_pe,
+            rho_num_layers,
+            use_bn=use_bn,
+            dropout=dropout,
+            activation=activation,
+        )
 
     def forward(self, x, edge_index, batch_index):
         N = x.shape[0]  # Total number of nodes in the batch.
-        x = x.transpose(0, 1) # N x K x In -> K x N x In
+        x = x.transpose(0, 1)  # N x K x In -> K x N x In
         x = self.enc(x, edge_index) + self.enc(-x, edge_index)
         x = x.transpose(0, 1).reshape(N, -1)  # K x N x Out -> N x (K * Out)
-        x = self.rho(x)  # N x dim_pe (Note: in the original codebase dim_pe is always K)
+        x = self.rho(
+            x
+        )  # N x dim_pe (Note: in the original codebase dim_pe is always K)
         return x
 
 
 class MaskedGINDeepSigns(nn.Module):
-    """ Sign invariant neural network with sum pooling and DeepSet.
-        f(v1, ..., vk) = rho(enc(v1) + enc(-v1), ..., enc(vk) + enc(-vk))
+    """Sign invariant neural network with sum pooling and DeepSet.
+    f(v1, ..., vk) = rho(enc(v1) + enc(-v1), ..., enc(vk) + enc(-vk))
     """
 
-    def __init__(self, in_channels, hidden_channels, out_channels, num_layers,
-                 dim_pe, rho_num_layers, use_bn=False, use_ln=False,
-                 dropout=0.5, activation='relu'):
+    def __init__(
+        self,
+        in_channels,
+        hidden_channels,
+        out_channels,
+        num_layers,
+        dim_pe,
+        rho_num_layers,
+        use_bn=False,
+        use_ln=False,
+        dropout=0.5,
+        activation="relu",
+    ):
         super().__init__()
-        self.enc = GIN(in_channels, hidden_channels, out_channels, num_layers,
-                       use_bn=use_bn, dropout=dropout, activation=activation)
-        self.rho = MLP(out_channels, hidden_channels, dim_pe, rho_num_layers,
-                       use_bn=use_bn, dropout=dropout, activation=activation)
+        self.enc = GIN(
+            in_channels,
+            hidden_channels,
+            out_channels,
+            num_layers,
+            use_bn=use_bn,
+            dropout=dropout,
+            activation=activation,
+        )
+        self.rho = MLP(
+            out_channels,
+            hidden_channels,
+            dim_pe,
+            rho_num_layers,
+            use_bn=use_bn,
+            dropout=dropout,
+            activation=activation,
+        )
 
     def batched_n_nodes(self, batch_index):
         batch_size = batch_index.max().item() + 1
         one = batch_index.new_ones(batch_index.size(0))
-        n_nodes = scatter(one, batch_index, dim=0, dim_size=batch_size,
-                          reduce='add')  # Number of nodes in each graph.
+        n_nodes = scatter(
+            one, batch_index, dim=0, dim_size=batch_size, reduce="add"
+        )  # Number of nodes in each graph.
         n_nodes = n_nodes.unsqueeze(1)
         return torch.cat([size * n_nodes.new_ones(size) for size in n_nodes])
 
@@ -168,11 +269,13 @@ class MaskedGINDeepSigns(nn.Module):
         # print(f"     - batched_num_nodes: {batched_num_nodes.shape} {batched_num_nodes}")
         x[~mask] = 0
         x = x.sum(dim=1)  # (sum over K) -> N x Out
-        x = self.rho(x)  # N x Out -> N x dim_pe (Note: in the original codebase dim_pe is always K)
+        x = self.rho(
+            x
+        )  # N x Out -> N x dim_pe (Note: in the original codebase dim_pe is always K)
         return x
 
 
-@register_node_encoder('SignNet')
+@register_node_encoder("SignNet")
 class SignNetNodeEncoder(torch.nn.Module):
     """SignNet Positional Embedding node encoder.
     https://arxiv.org/abs/2202.13013
@@ -201,7 +304,7 @@ class SignNetNodeEncoder(torch.nn.Module):
         pecfg = cfg.posenc_SignNet
         dim_pe = pecfg.dim_pe  # Size of PE embedding
         model_type = pecfg.model  # Encoder NN model type for SignNet
-        if model_type not in ['MLP', 'DeepSet']:
+        if model_type not in ["MLP", "DeepSet"]:
             raise ValueError(f"Unexpected SignNet model {model_type}")
         self.model_type = model_type
         sign_inv_layers = pecfg.layers  # Num. layers in \phi GNN part
@@ -212,15 +315,17 @@ class SignNetNodeEncoder(torch.nn.Module):
         self.pass_as_var = pecfg.pass_as_var  # Pass PE also as a separate variable
 
         if dim_emb - dim_pe < 1:
-            raise ValueError(f"SignNet PE size {dim_pe} is too large for "
-                             f"desired embedding size of {dim_emb}.")
+            raise ValueError(
+                f"SignNet PE size {dim_pe} is too large for "
+                f"desired embedding size of {dim_emb}."
+            )
 
         if expand_x:
             self.linear_x = nn.Linear(dim_in, dim_emb - dim_pe)
         self.expand_x = expand_x
 
         # Sign invariant neural network.
-        if self.model_type == 'MLP':
+        if self.model_type == "MLP":
             self.sign_inv_net = GINDeepSigns(
                 in_channels=1,
                 hidden_channels=pecfg.phi_hidden_dim,
@@ -231,9 +336,9 @@ class SignNetNodeEncoder(torch.nn.Module):
                 rho_num_layers=rho_layers,
                 use_bn=True,
                 dropout=0.0,
-                activation='relu'
+                activation="relu",
             )
-        elif self.model_type == 'DeepSet':
+        elif self.model_type == "DeepSet":
             self.sign_inv_net = MaskedGINDeepSigns(
                 in_channels=1,
                 hidden_channels=pecfg.phi_hidden_dim,
@@ -243,16 +348,18 @@ class SignNetNodeEncoder(torch.nn.Module):
                 rho_num_layers=rho_layers,
                 use_bn=True,
                 dropout=0.0,
-                activation='relu'
+                activation="relu",
             )
         else:
             raise ValueError(f"Unexpected model {self.model_type}")
 
     def forward(self, batch):
-        if not (hasattr(batch, 'eigvals_sn') and hasattr(batch, 'eigvecs_sn')):
-            raise ValueError("Precomputed eigen values and vectors are "
-                             f"required for {self.__class__.__name__}; "
-                             "set config 'posenc_SignNet.enable' to True")
+        if not (hasattr(batch, "eigvals_sn") and hasattr(batch, "eigvecs_sn")):
+            raise ValueError(
+                "Precomputed eigen values and vectors are "
+                f"required for {self.__class__.__name__}; "
+                "set config 'posenc_SignNet.enable' to True"
+            )
         # eigvals = batch.eigvals_sn
         eigvecs = batch.eigvecs_sn
 
@@ -263,7 +370,9 @@ class SignNetNodeEncoder(torch.nn.Module):
         pos_enc[empty_mask] = 0  # (Num nodes) x (Num Eigenvectors) x 1
 
         # SignNet
-        pos_enc = self.sign_inv_net(pos_enc, batch.edge_index, batch.batch)  # (Num nodes) x (pos_enc_dim)
+        pos_enc = self.sign_inv_net(
+            pos_enc, batch.edge_index, batch.batch
+        )  # (Num nodes) x (pos_enc_dim)
 
         # Expand node features if needed
         if self.expand_x:
