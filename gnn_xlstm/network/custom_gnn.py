@@ -5,6 +5,7 @@ import torch_geometric.graphgym.register as register
 from torch_geometric.graphgym.config import cfg
 from torch_geometric.graphgym.models.gnn import FeatureEncoder, GNNPreMP
 from torch_geometric.graphgym.register import register_network
+from torch_sparse import SparseTensor
 
 from gnn_xlstm.layer.gat_conv_layer import GATConvv2Layer
 from gnn_xlstm.layer.gatedgcn_layer import GatedGCNLayer
@@ -57,6 +58,14 @@ class CustomGNN(torch.nn.Module):
             raise ValueError("Model {} unavailable".format(model_type))
 
     def forward(self, batch):
+        if cfg.gnn.force_sparse_tensors and not isinstance(
+            batch.edge_index, SparseTensor
+        ):
+            batch.edge_index = SparseTensor(
+                row=batch.edge_index[0],
+                col=batch.edge_index[1],
+                sparse_sizes=(batch.num_nodes, batch.num_nodes),
+            )
         for module in self.children():
             if self.use_k_hop_aggregation and isinstance(module, nn.Sequential):
                 for i, sublayer in enumerate(module):

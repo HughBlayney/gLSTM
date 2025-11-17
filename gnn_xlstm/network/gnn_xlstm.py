@@ -6,6 +6,7 @@ from typing import Callable, Iterator, Optional
 import torch
 import torch.nn as nn
 import torch_geometric.graphgym.register as register
+import torch_sparse
 from einops import einsum, rearrange
 from torch import Tensor, exp, sigmoid
 from torch_geometric.graphgym.config import cfg
@@ -20,6 +21,7 @@ from torch_geometric.nn.aggr import (
 )
 from torch_geometric.utils import add_self_loops
 from torch_scatter import scatter
+from torch_sparse import SparseTensor
 
 from gnn_xlstm.network.base import BaseGNN
 
@@ -78,6 +80,7 @@ class InputGateType(EnumFromStr):
     EGO = "ego"
     NEIGHBOUR = "neighbour"
     EDGE = "edge"
+    NO_INPUT_GATE = "no_input_gate"
 
     def to_xLSTM_class(self):
         if self is InputGateType.EGO:
@@ -86,6 +89,8 @@ class InputGateType(EnumFromStr):
             return NeighbourInputGatexLSTM
         elif self is InputGateType.EDGE:
             return EdgeInputGatexLSTM
+        elif self is InputGateType.NO_INPUT_GATE:
+            return NoInputGatexLSTM
 
 
 class SeparateAggregation(Aggregation):
@@ -176,9 +181,15 @@ class xLSTMLayer(MessagePassing, ABC):
         self.use_input_gate = use_input_gate
         self.use_forget_gate = use_forget_gate
 
-        self.W_f = nn.Linear(inp_dim, head_num)
+        if use_forget_gate:
+            self.W_f = nn.Linear(inp_dim, head_num)
+        else:
+            self.W_f = None
 
-        self.W_o = nn.Linear(inp_dim, v_hid_dim)
+        if use_output_gate:
+            self.W_o = nn.Linear(inp_dim, v_hid_dim)
+        else:
+            self.W_o = None
 
         self.W_q = nn.Linear(inp_dim * 2, qk_hid_dim)
         self.W_k = nn.Linear(inp_dim, qk_hid_dim)
@@ -205,6 +216,19 @@ class xLSTMLayer(MessagePassing, ABC):
         # Add self-loops to the edge index
         self_loop_edge_index, _ = add_self_loops(edge_index, num_nodes=x.shape[0])
 
+        if cfg.gnn.force_sparse_tensors and not isinstance(edge_index, SparseTensor):
+            edge_index = SparseTensor(
+                row=edge_index[0],
+                col=edge_index[1],
+                sparse_sizes=(x.shape[0], x.shape[0]),
+            )
+            if not isinstance(self_loop_edge_index, SparseTensor):
+                self_loop_edge_index = SparseTensor(
+                    row=self_loop_edge_index[0],
+                    col=self_loop_edge_index[1],
+                    sparse_sizes=(x.shape[0], x.shape[0]),
+                )
+
         x_n: Tensor = self.inp_norm(x)  # shape: b i
         x_n = self.dropout_layer(x_n)  # Apply dropout after input normalization
 
@@ -216,19 +240,32 @@ class xLSTMLayer(MessagePassing, ABC):
         )
         v_t = rearrange(self.W_v(x_c), "b (h d) -> b h d", h=self.head_num)
 
-        f_tilde: Tensor = self.W_f(x_c)  # shape: b h
-        o_tilde: Tensor = self.W_o(x_c)  # shape: b (h d)
+        if self.use_forget_gate:
+            f_tilde: Tensor = self.W_f(x_c)  # shape: b h
+        else:
+            f_tilde = None
+
+        if self.use_output_gate:
+            o_tilde: Tensor = self.W_o(x_c)  # shape: b (h d)
+        else:
+            o_tilde = None
 
         aggregated_ivk_t, aggregated_ik_t, m_t = self.get_aggregated_inputs(
             self_loop_edge_index, x_c, v_t, k_t, m_prev, f_tilde
         )
 
-        row, col = edge_index
-        x_c_j = x_c.view(x_c.shape[0], -1)[row]
-
-        aggregated_x_c = scatter(
-            x_c_j, col, dim=0, dim_size=x_c.size(0), reduce="sum"
-        ).view(x_c.shape)
+        if isinstance(edge_index, SparseTensor):
+            # Efficiently aggregate x_c using sparse matrix multiplication
+            # x_c: [num_nodes, ...]; SparseTensor: [num_nodes, num_nodes]
+            # Here, we assume x_c is [num_nodes, dim]
+            # (If x_c has shape [N, ...] keep second dimension as -1)
+            aggregated_x_c = edge_index.matmul(x_c)
+        else:
+            row, col = edge_index
+            x_c_j = x_c.view(x_c.shape[0], -1)[row]
+            aggregated_x_c = scatter(
+                x_c_j, col, dim=0, dim_size=x_c.size(0), reduce="sum"
+            ).view(x_c.shape)
 
         q_t = rearrange(
             self.W_q(torch.cat([x_c, aggregated_x_c], dim=-1)),
@@ -238,24 +275,27 @@ class xLSTMLayer(MessagePassing, ABC):
 
         if self.use_forget_gate:
             f_t = exp(f_tilde - m_t + m_prev)  # Eq. (26) in ref. paper
+            f_c_prev = enlarge_as(f_t, c_prev) * c_prev
+            f_n_prev = enlarge_as(f_t, n_prev) * n_prev
         else:
-            f_t = torch.ones_like(f_tilde)
+            f_c_prev = c_prev
+            f_n_prev = n_prev
 
         if self.use_output_gate:
             o_t = sigmoid(o_tilde)  # Eq. (27) in ref. paper
-        else:
-            o_t = torch.ones_like(o_tilde)
 
         # Update the internal states of the model
-        c_t = enlarge_as(f_t, c_prev) * c_prev + aggregated_ivk_t
-        n_t = enlarge_as(f_t, n_prev) * n_prev + aggregated_ik_t
+        c_t = f_c_prev + aggregated_ivk_t
+        n_t = f_n_prev + aggregated_ik_t
         # Note - I believe the omission of taking the absolute value of n_t^Tq_t here is not a problem, due to
         # clamping from below to 1. Negative values would simply be clamped to 1.
-        h_t = o_t * rearrange(
+        h_t = rearrange(
             einsum(c_t, q_t, "b h d p, b h p -> b h d")
             / einsum(n_t, q_t, "b h d, b h d -> b h").clamp(min=1).unsqueeze(-1),
             "b h d -> b (h d)",
         )  # Eq. (21) in ref. paper
+        if self.use_output_gate:
+            h_t = o_t * h_t
 
         out = self.hid_norm(h_t)
 
@@ -273,6 +313,34 @@ class xLSTMLayer(MessagePassing, ABC):
     def get_aggregated_inputs(self, edge_index, x_c, v_t, k_t, m_prev, f_tilde):
         pass
 
+    def message_and_aggregate(self, adj_t, x):
+        return torch_sparse.matmul(adj_t, x, reduce=self.aggr)
+
+
+class NoInputGatexLSTM(xLSTMLayer):
+    """
+    Ego input gating - where the input gate is computed based on the node's own embedding.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def get_aggregated_inputs(self, edge_index, x_c, v_t, k_t, m_prev, f_tilde):
+
+        vk_t = einsum(v_t, k_t, "b h d, b h p -> b h d p")
+
+        aggregated_vk_t = self.propagate(
+            edge_index, x=vk_t.view(vk_t.shape[0], -1)
+        ).view(-1, self.head_num, self.v_head_dim, self.qk_head_dim)
+        aggregated_k_t = self.propagate(edge_index, x=k_t.view(k_t.shape[0], -1)).view(
+            -1, self.head_num, self.qk_head_dim
+        )
+
+        return aggregated_vk_t, aggregated_k_t, None
+
+    def message_and_aggregate(self, adj_t, x):
+        return torch_sparse.matmul(adj_t, x, reduce=self.aggr)
+
 
 class EgoInputGatexLSTM(xLSTMLayer):
     """
@@ -284,7 +352,10 @@ class EgoInputGatexLSTM(xLSTMLayer):
         self.W_i = nn.Linear(self.inp_dim, self.head_num)
 
     def get_aggregated_inputs(self, edge_index, x_c, v_t, k_t, m_prev, f_tilde):
-        row, col = edge_index
+        if isinstance(edge_index, SparseTensor):
+            row, col, _ = edge_index.coo()
+        else:
+            row, col = edge_index
         i_tilde = self.W_i(x_c)
 
         # Use torch.scatter_reduce instead of torch_scatter.scatter for functorch compatibility

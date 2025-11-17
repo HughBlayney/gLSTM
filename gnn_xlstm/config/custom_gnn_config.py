@@ -18,3 +18,5 @@ def custom_gnn_cfg(cfg):
 
     cfg.gnn.shared = False
     cfg.gnn.use_k_hop_aggregation = False
+
+    cfg.gnn.force_sparse_tensors = False
