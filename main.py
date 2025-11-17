@@ -8,6 +8,7 @@ import os
 import uuid
 
 import torch
+import torch_geometric
 from torch_geometric import seed_everything
 from torch_geometric.graphgym.cmd_args import parse_args
 from torch_geometric.graphgym.config import (
@@ -17,7 +18,6 @@ from torch_geometric.graphgym.config import (
     makedirs_rm_exist,
     set_cfg,
 )
-from torch_geometric.graphgym.loader import create_loader
 from torch_geometric.graphgym.logger import set_printing
 from torch_geometric.graphgym.optim import create_optimizer, create_scheduler
 from torch_geometric.graphgym.register import train_dict
@@ -28,6 +28,7 @@ import gnn_xlstm  # noqa, register custom modules
 from gnn_xlstm.agg_runs import agg_runs
 from gnn_xlstm.finetuning import init_model_from_pretrained, load_pretrained_model_cfg
 from gnn_xlstm.logger import create_logger
+from gnn_xlstm.patches import create_loader
 from gnn_xlstm.utils import (
     create_model,
     new_optimizer_config,
@@ -45,7 +46,10 @@ MAX_PARAM_OPTIMISATION_ITERATIONS = 100
 # override these arguments to ensure that they remain float types.
 FLOAT_OVERRIDE_ARGUMENTS = [
     "ssm.state_eigenvalue_magnitude",
+    "optim.weight_decay",
 ]
+
+torch.serialization.add_safe_globals([torch_geometric.data.data.DataEdgeAttr])
 
 
 def custom_set_out_dir(cfg, cfg_fname, name_tag):
@@ -196,6 +200,7 @@ if __name__ == "__main__":
                     f"Num trainable parameters: {cfg.trainable_params} "
                     f"exceeds parameter limit: {cfg.train.parameter_limit}"
                 )
+
         # Start training
         if cfg.train.mode == "standard":
             if cfg.wandb.use:
@@ -207,28 +212,33 @@ if __name__ == "__main__":
             train(model, datamodule, logger=True)
         else:
             train_dict[cfg.train.mode](loggers, loaders, model, optimizer, scheduler)
+    device = torch.device("cuda")
+    max_memory_allocated = torch.cuda.max_memory_allocated(device=device)
+    logging.info(f"Max memory allocated: {max_memory_allocated / 1024**3} GB")
+    with open(os.path.join(cfg.out_dir, "max_memory_allocated.txt"), "w") as f:
+        f.write(f"{max_memory_allocated}")
 
     # Finally, try to record some grad statistics for the key-value task
-    if args.save_key_value_grad_metrics:
-        try:
-            save_key_value_grad_metrics(
-                cfg.out_dir,
-                device=cfg.accelerator,
-                save_files=True,
-                skip_existing=False,
-                num_seeds=args.repeat,
-                max_examples_to_process=25,
-            )
-            save_jacobian_metrics(
-                cfg.out_dir,
-                device=cfg.accelerator,
-                save_files=True,
-                skip_existing=False,
-                num_seeds=args.repeat,
-                max_examples_to_process=25,
-            )
-        except Exception as e:
-            logging.info(f"Failed when trying to save grad statistics: {e}")
+    # if args.save_key_value_grad_metrics:
+    #     try:
+    #         save_key_value_grad_metrics(
+    #             cfg.out_dir,
+    #             device=cfg.accelerator,
+    #             save_files=True,
+    #             skip_existing=False,
+    #             num_seeds=args.repeat,
+    #             max_examples_to_process=25,
+    #         )
+    #         save_jacobian_metrics(
+    #             cfg.out_dir,
+    #             device=cfg.accelerator,
+    #             save_files=True,
+    #             skip_existing=False,
+    #             num_seeds=args.repeat,
+    #             max_examples_to_process=25,
+    #         )
+    #     except Exception as e:
+    #         logging.info(f"Failed when trying to save grad statistics: {e}")
     # Aggregate results from different seeds
     try:
         agg_runs(cfg.out_dir, cfg.metric_best)
