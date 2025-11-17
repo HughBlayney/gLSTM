@@ -1,0 +1,50 @@
+out_dir: results
+metric_best: accuracy
+wandb:
+  use: False
+  project: hetero-amazon-ratings
+dataset:
+  format: PyG-hetero
+  name: amazon-ratings
+  task: node
+  task_type: classification
+  transductive: True
+  node_encoder: True
+  node_encoder_name: LinearNode
+  node_encoder_bn: False
+  edge_encoder: False
+  edge_encoder_name: DummyEdge
+  edge_encoder_bn: False
+  split: [0.6, 0.2, 0.2]
+train:
+  mode: custom
+  batch_size: 1
+  eval_period: 1
+  ckpt_period: 100
+model:
+  type: gnn_xlstm
+  loss_fun: cross_entropy
+  graph_pooling: mean
+gnn:
+  layers_mp: 4
+  layers_post_mp: 1
+  dim_inner: 512
+  act: relu
+  use_k_hop_aggregation: False
+xlstm:
+  num_blocks: 1
+  num_heads: 4
+  memory_dim: 8
+  aggr: add
+  input_norm_type: batch # careful - this cannot be group
+  hidden_norm_type: group
+  input_gate_type: ego
+  dropout: 0.5
+optim:
+  clip_grad_norm: True
+  optimizer: adamW
+  weight_decay: 0.0
+  base_lr: 0.001
+  max_epoch: 2500
+  scheduler: cosine_with_warmup
+  num_warmup_epochs: 5

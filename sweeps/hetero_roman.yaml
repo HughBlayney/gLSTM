@@ -1,0 +1,33 @@
+program: main.py
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - --cfg
+  - configs/GNN-xLSTM/hetero-roman-empire-GNN-xLSTM.yaml
+  - wandb.use
+  - True
+  - gnn.shared
+  - False
+  - wandb.sweep_hacks
+  - True
+  - ${args_no_hyphens}
+  - optim.early_stopping_patience
+  - 100
+  - optim.max_epoch
+  - 1000
+  - out_dir
+  - sweeps/results
+
+method: grid
+metric:
+  name: best/val_accuracy
+  goal: maximize
+
+parameters:
+  xlstm.memory_dim:
+    values: [8, 16, 32]
+  xlstm.num_heads:
+    values: [4, 8]
+  gnn.layers_mp:
+    values: [4, 6, 8, 10, 12]

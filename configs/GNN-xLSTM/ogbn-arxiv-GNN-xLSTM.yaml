@@ -1,0 +1,51 @@
+out_dir: results
+metric_best: accuracy
+wandb:
+  use: True
+  project: ogbn-arxiv
+dataset:
+  format: OGB
+  name: ogbn-arxiv
+  task: node
+  task_type: classification
+  transductive: True
+  node_encoder: True
+  node_encoder_name: LinearNode
+  node_encoder_bn: False
+  edge_encoder: False
+  edge_encoder_name: DummyEdge
+  edge_encoder_bn: False
+train:
+  mode: custom
+  batch_size: 1
+  eval_period: 1
+  ckpt_period: 100
+  eval_smoothing_metrics: False
+model:
+  type: gnn_xlstm
+  loss_fun: cross_entropy
+  graph_pooling: mean
+gnn:
+  layers_mp: 4
+  layers_post_mp: 1
+  dim_inner: 256
+  act: relu
+  use_k_hop_aggregation: False
+  force_sparse_tensors: True
+xlstm:
+  num_blocks: 1
+  num_heads: 4
+  memory_dim: 32
+  aggr: add
+  input_norm_type: batch # careful - this cannot be group
+  hidden_norm_type: group
+  input_gate_type: ego
+  dropout: 0.5
+optim:
+  clip_grad_norm: True
+  optimizer: adamW
+  weight_decay: 1e-05
+  base_lr: 0.0005
+  max_epoch: 2000
+  scheduler: cosine_with_warmup
+  num_warmup_epochs: 5

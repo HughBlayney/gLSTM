@@ -15,10 +15,12 @@ from torch_geometric.datasets import (
     Amazon,
     Coauthor,
     GNNBenchmarkDataset,
+    HeterophilousGraphDataset,
     KarateClub,
     MNISTSuperpixels,
     Planetoid,
     QM7b,
+    SNAPDataset,
     TUDataset,
     WebKB,
     WikipediaNetwork,
@@ -209,12 +211,20 @@ def load_dataset_master(format, name, dataset_dir):
                 dataset_dir, name, cfg.dataset.slic_compactness
             )
 
+        elif pyg_dataset_id == "hetero":
+            dataset = HeterophilousGraphDataset(
+                dataset_dir, name
+            )  # , pre_transform=KHopTransform(k=int(1e6)))
+
         else:
             raise ValueError(f"Unexpected PyG Dataset identifier: {format}")
 
     # GraphGym default loader for Pytorch Geometric datasets
     elif format == "PyG":
         dataset = load_pyg(name, dataset_dir, pre_transform=KHopTransform(k=int(1e6)))
+
+    elif format == "SNAP":
+        dataset = SNAPDataset(dataset_dir, name)
 
     elif format == "OGB":
         if name.startswith("ogbg"):
@@ -241,6 +251,14 @@ def load_dataset_master(format, name, dataset_dir):
             convert_to_int(dataset, "train_edge_label")
             convert_to_int(dataset, "val_edge_label")
             convert_to_int(dataset, "test_edge_label")
+
+        ### Node prediction datasets.
+        elif name.startswith("ogbn-"):
+            # GraphGym default loader.
+            dataset = load_ogb(name, dataset_dir)
+
+            # Squeeze the y tensor to 1 dimension
+            dataset.data.y = dataset.data.y.squeeze(1)
 
         elif name.startswith("PCQM4Mv2Contact-"):
             dataset = preformat_PCQM4Mv2Contact(dataset_dir, name)
