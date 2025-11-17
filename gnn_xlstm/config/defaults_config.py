@@ -24,6 +24,9 @@ def overwrite_defaults_cfg(cfg):
     # Set this as a string in the format of "gnn.dim_inner"
     cfg.train.dependent_parameter = None
 
+    cfg.train.num_parts = 10
+    cfg.val.num_parts = 1
+
     # Overwrite default dataset name
     cfg.dataset.name = "none"
 
