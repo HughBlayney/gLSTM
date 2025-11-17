@@ -34,6 +34,7 @@ from gnn_xlstm.utils import (
     new_optimizer_config,
     new_scheduler_config,
     params_count,
+    save_jacobian_metrics,
     save_key_value_grad_metrics,
     trainable_params_count,
 )
@@ -212,33 +213,28 @@ if __name__ == "__main__":
             train(model, datamodule, logger=True)
         else:
             train_dict[cfg.train.mode](loggers, loaders, model, optimizer, scheduler)
-    device = torch.device("cuda")
-    max_memory_allocated = torch.cuda.max_memory_allocated(device=device)
-    logging.info(f"Max memory allocated: {max_memory_allocated / 1024**3} GB")
-    with open(os.path.join(cfg.out_dir, "max_memory_allocated.txt"), "w") as f:
-        f.write(f"{max_memory_allocated}")
 
     # Finally, try to record some grad statistics for the key-value task
-    # if args.save_key_value_grad_metrics:
-    #     try:
-    #         save_key_value_grad_metrics(
-    #             cfg.out_dir,
-    #             device=cfg.accelerator,
-    #             save_files=True,
-    #             skip_existing=False,
-    #             num_seeds=args.repeat,
-    #             max_examples_to_process=25,
-    #         )
-    #         save_jacobian_metrics(
-    #             cfg.out_dir,
-    #             device=cfg.accelerator,
-    #             save_files=True,
-    #             skip_existing=False,
-    #             num_seeds=args.repeat,
-    #             max_examples_to_process=25,
-    #         )
-    #     except Exception as e:
-    #         logging.info(f"Failed when trying to save grad statistics: {e}")
+    if args.save_key_value_grad_metrics:
+        try:
+            save_key_value_grad_metrics(
+                cfg.out_dir,
+                device=cfg.accelerator,
+                save_files=True,
+                skip_existing=False,
+                num_seeds=args.repeat,
+                max_examples_to_process=25,
+            )
+            save_jacobian_metrics(
+                cfg.out_dir,
+                device=cfg.accelerator,
+                save_files=True,
+                skip_existing=False,
+                num_seeds=args.repeat,
+                max_examples_to_process=25,
+            )
+        except Exception as e:
+            logging.info(f"Failed when trying to save grad statistics: {e}")
     # Aggregate results from different seeds
     try:
         agg_runs(cfg.out_dir, cfg.metric_best)
