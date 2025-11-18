@@ -91,3 +91,12 @@ python notebook_utils.py
 to run this. This should populate the `figures` directory.
 
 You can recreate the deep-vs-shallow Tree Jacobian Norms figure (Figure 2) by running the `flat_vs_deep_sensitivity.ipynb` notebook.
+
+## Testing
+
+I have added in some basic testing for the NAR (key-recall) synthetic task and the associated embedding function. You can find these in the `tests` directory. Note that these tests are for NAR only - not NARR.
+
+Run these by installing `pytest` and running:
+```bash
+pytest tests
+```
