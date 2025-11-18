@@ -16,6 +16,7 @@ from gnn_xlstm.encoder.kernel_pos_encoder import (
     HKdiagSENodeEncoder,
     RWSENodeEncoder,
 )
+from gnn_xlstm.encoder.key_recall_encoder import KeyRecallEncoder
 from gnn_xlstm.encoder.laplace_pos_encoder import LapPENodeEncoder
 from gnn_xlstm.encoder.linear_node_encoder import LinearNodeEncoder
 from gnn_xlstm.encoder.ppa_encoder import PPANodeEncoder
@@ -133,6 +134,7 @@ ds_encs = {
     "VOCNode": VOCNodeEncoder,
     "COCONode": COCONodeEncoder,
     "LinearNode": LinearNodeEncoder,
+    "KeyRecall": KeyRecallEncoder,
 }
 
 # Positional Encoding node encoders.
