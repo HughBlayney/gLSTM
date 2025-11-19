@@ -1,0 +1,62 @@
+out_dir: results/key_recall
+metric_best: accuracy
+wandb:
+  use: False
+  project: key-recall
+dataset:
+  format: custom
+  name: key-recall
+  task: graph
+  task_type: classification
+  transductive: False
+  node_encoder: True
+  node_encoder_name: KeyRecall+LapPE
+  edge_encoder: False
+  node_encoder_bn: False
+posenc_LapPE:
+  enable: True
+  eigen:
+    laplacian_norm: none
+    eigvec_norm: L2
+    max_freqs: 10
+  model: DeepSet
+  dim_pe: 16
+  layers: 2
+  raw_norm_type: none
+key_recall:
+  num_key_nodes: 8
+  num_classes: None
+  num_train_graphs: 8000
+  num_val_graphs: 1000
+  num_test_graphs: 1000
+train:
+  mode: custom
+  batch_size: 64
+  eval_period: 1
+  ckpt_best: True
+  ckpt_clean: True
+model:
+  type: GPSModel
+  loss_fun: cross_entropy
+  graph_pooling: add
+gt:
+  layer_type: GCN+Transformer
+  layers: 2
+  n_heads: 1
+  dim_hidden: 256  # `gt.dim_hidden` must match `gnn.dim_inner`
+  layer_norm: True
+  batch_norm: False
+gnn:
+  head: ring-transfer
+  dim_inner: 256
+  layers_post_mp: 1
+  act: gelu
+  batchnorm: True
+optim:
+  clip_grad_norm: True
+  optimizer: adamW
+  weight_decay: 0.0
+  base_lr: 0.001
+  max_epoch: 200
+  early_stopping_loss_threshold: 0.001
+  early_stopping_patience: 50
