@@ -212,9 +212,11 @@ def load_dataset_master(format, name, dataset_dir):
             )
 
         elif pyg_dataset_id == "hetero":
+            # We set this to 15 rather than the usual 1e6 as otherwise minesweeper (with a very large diameter)
+            # causes issues. And in reality we're running this dataset with 14 or fewer layers
             dataset = HeterophilousGraphDataset(
                 dataset_dir, name
-            )  # , pre_transform=KHopTransform(k=int(1e6)))
+            , pre_transform=KHopTransform(k=15, verbose=True))
 
         else:
             raise ValueError(f"Unexpected PyG Dataset identifier: {format}")

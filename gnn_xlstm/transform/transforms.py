@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import torch
 from scipy import sparse
-from scipy.sparse.csgraph import floyd_warshall
+from scipy.sparse.csgraph import johnson
 from torch_geometric.data import Data
 from torch_geometric.utils import from_scipy_sparse_matrix, subgraph, to_dense_adj
 from tqdm import tqdm
@@ -92,14 +92,17 @@ def clip_graphs_to_size(data, size_limit=5000):
 
 class KHopTransform:
 
-    def __init__(self, k: int = int(1e6)) -> None:
+    def __init__(self, k: int = int(1e6), verbose: bool = False) -> None:
         self.k = k
+        self.verbose = verbose
 
     def __call__(self, data: Data) -> Data:
         A = to_dense_adj(data.edge_index)
-        dist = floyd_warshall(
-            A.squeeze().cpu().numpy(), directed=False, unweighted=True
-        )
+        if self.verbose:
+            print("Computing all-pairs shortest paths...")
+        dist = johnson(A.squeeze().cpu().numpy(), directed=False, unweighted=True)
+        if self.verbose:
+            print("Finished computing all-pairs shortest paths.")
         dist = np.where(np.isfinite(dist), dist, -1).astype(
             np.int32
         )  # -1s are nodes in same batch, different graph
@@ -109,7 +112,7 @@ class KHopTransform:
         idx = [0]
         data.max_k = [np.max(dist)]
 
-        for k in range(1, min(np.max(dist), self.k) + 1):
+        for k in tqdm(range(1, min(np.max(dist), self.k) + 1), desc="Computing k-hop edges", disable=not self.verbose):
             A_k_hop = (dist == k).astype(int)
             k_edges = from_scipy_sparse_matrix(sparse.csr_matrix(A_k_hop))[0]
             k_edge_index = torch.cat((k_edge_index, k_edges), dim=1)
