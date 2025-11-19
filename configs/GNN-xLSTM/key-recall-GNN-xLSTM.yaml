@@ -31,17 +31,17 @@ model:
   graph_pooling: add
 gnn:
   head: ring-transfer
-  dim_inner: 32
+  dim_inner: 64
   layers_mp: 2
   layers_post_mp: 1
   batchnorm: False
   act: none
   shared: False
-  use_k_hop_aggregation: False
+  use_k_hop_aggregation: True
 xlstm:
   num_blocks: 1
   num_heads: 1
-  memory_dim: 16
+  memory_dim: 32
   aggr: add
   input_norm_type: none # careful - this cannot be group
   hidden_norm_type: group

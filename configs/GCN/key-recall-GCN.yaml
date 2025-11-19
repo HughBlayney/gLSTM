@@ -31,7 +31,7 @@ model:
   graph_pooling: add
 gnn:
   head: ring-transfer
-  dim_inner: 128
+  dim_inner: 256
   layers_mp: 2
   layers_post_mp: 1
   layer_type: gcnconv
