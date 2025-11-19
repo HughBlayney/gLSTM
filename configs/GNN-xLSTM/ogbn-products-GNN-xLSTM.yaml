@@ -56,7 +56,6 @@ xlstm:
   input_norm_type: layer # careful - this cannot be group
   hidden_norm_type: group
   input_gate_type: ego
-  use_forget_gate: False
   dropout: 0.5
 optim:
   clip_grad_norm: True
